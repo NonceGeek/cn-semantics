@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "dev": "deno run --watch -A main.tsx",
+    "deploy": "deployctl deploy --prod --project=letter-yyk main.tsx"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  },
+  "deploy": {
+    "project": "fbff84b3-a463-41dd-bf60-d449b9f4cd23",
+    "exclude": [
+      "**/node_modules"
+    ],
+    "include": [],
+    "entrypoint": "main.tsx"
+  }
+}

@@ -1,0 +1,691 @@
+/* 
+ * 尹毓恪 - 致粉丝的信
+ * 样式表文件
+ * 法国新浪潮 × 韦斯·安德森复古风格
+ */
+
+/* ==================== 全局样式 ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #d5e5ea 0%, #b8cfd9 50%, #9fb4c7 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 背景装饰波浪 */
+.background-waves {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.1;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* ==================== 主容器 ==================== */
+.main-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 900px;
+    perspective: 1500px;
+}
+
+/* ==================== 信封样式（初始状态） ==================== */
+.envelope-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.envelope-container:hover {
+    transform: scale(1.02);
+}
+
+.envelope-container.opened {
+    pointer-events: none;
+    animation: envelopeDisappear 1s ease-out forwards;
+}
+
+@keyframes envelopeDisappear {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.9) translateY(-30px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.7) translateY(-80px);
+        visibility: hidden;
+    }
+}
+
+/* 信封主体 */
+.envelope {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1.6 / 1;
+    background: linear-gradient(135deg, #f5f0e8 0%, #ebe4d8 100%);
+    box-shadow: 
+        0 20px 60px rgba(74, 107, 124, 0.3),
+        inset 0 0 30px rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+}
+
+/* 信封折叠上盖 */
+.envelope-flap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60%;
+    background: linear-gradient(135deg, #ebe4d8 0%, #ddd4c4 100%);
+    clip-path: polygon(0 0, 50% 70%, 100% 0);
+    box-shadow: 0 10px 30px rgba(74, 107, 124, 0.2);
+    transform-origin: top center;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+}
+
+.envelope-container:hover .envelope-flap {
+    transform: rotateX(-5deg);
+}
+
+/* 信封装饰邮票 */
+.envelope-stamp {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    width: 70px;
+    height: 85px;
+    background: linear-gradient(135deg, #9fb4c7 0%, #7a94a8 100%);
+    border: 3px solid #f5f0e8;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+/* 邮票锯齿边缘效果 */
+.envelope-stamp::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    background: radial-gradient(circle, transparent 30%, rgba(245, 240, 232, 0.4) 31%, rgba(245, 240, 232, 0.4) 35%, transparent 36%);
+    background-size: 7px 7px;
+    background-position: -1px -1px;
+}
+
+/* 邮戳效果 */
+.envelope-postmark {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 120px;
+    border: 3px solid rgba(122, 148, 168, 0.3);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.postmark-text {
+    font-size: 14px;
+    color: rgba(74, 107, 124, 0.5);
+    letter-spacing: 2px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+/* 提示文字 */
+.envelope-hint {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    color: #4a6b7c;
+    letter-spacing: 2px;
+    animation: pulse 2s ease-in-out infinite;
+    white-space: nowrap;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.6;
+        transform: translateX(-50%) translateY(0);
+    }
+    50% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-5px);
+    }
+}
+
+/* ==================== 信纸样式（展开后） ==================== */
+.letter-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+    visibility: hidden;
+    background: #fdfaf5;
+    box-shadow: 
+        0 0 0 1px rgba(139, 169, 179, 0.1),
+        0 30px 80px rgba(74, 107, 124, 0.4),
+        inset 0 0 100px rgba(255, 250, 240, 0.5);
+    border-radius: 6px;
+    padding: 80px 100px 100px;
+    overflow-y: auto;
+    transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.letter-container.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* 自定义滚动条样式 */
+.letter-container::-webkit-scrollbar {
+    width: 12px;
+}
+
+.letter-container::-webkit-scrollbar-track {
+    background: rgba(213, 229, 234, 0.3);
+    border-radius: 0 6px 6px 0;
+}
+
+.letter-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #9fb4c7 0%, #7a94a8 100%);
+    border-radius: 6px;
+    border: 2px solid #fdfaf5;
+}
+
+.letter-container::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #7a94a8 0%, #4a6b7c 100%);
+}
+
+/* Firefox 滚动条样式 */
+.letter-container {
+    scrollbar-width: thin;
+    scrollbar-color: #9fb4c7 rgba(213, 229, 234, 0.3);
+}
+
+/* 纸张纹理效果 */
+.letter-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139, 169, 179, 0.02) 2px, rgba(139, 169, 179, 0.02) 4px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(139, 169, 179, 0.02) 2px, rgba(139, 169, 179, 0.02) 4px);
+    border-radius: 6px;
+    pointer-events: none;
+}
+
+/* 信纸装饰性邮票 */
+.letter-stamp {
+    position: absolute;
+    width: 90px;
+    height: 110px;
+    background: linear-gradient(135deg, #9fb4c7 0%, #7a94a8 100%);
+    border: 4px solid #fdfaf5;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+}
+
+.letter-stamp-left {
+    top: -20px;
+    left: -20px;
+    transform: rotate(-12deg);
+}
+
+.letter-stamp-right {
+    top: -20px;
+    right: -20px;
+    transform: rotate(12deg);
+}
+
+.letter-stamp::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    background: radial-gradient(circle, transparent 30%, rgba(253, 250, 245, 0.3) 31%, rgba(253, 250, 245, 0.3) 35%, transparent 36%);
+    background-size: 9px 9px;
+    background-position: -2px -2px;
+}
+
+.letter-stamp-inner {
+    position: absolute;
+    inset: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+}
+
+/* 角落装饰 */
+.corner-decoration {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border-color: #9fb4c7;
+    opacity: 0.3;
+}
+
+.corner-top-left {
+    top: 25px;
+    left: 25px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+}
+
+.corner-top-right {
+    top: 25px;
+    right: 25px;
+    border-top: 2px solid;
+    border-right: 2px solid;
+}
+
+.corner-bottom-left {
+    bottom: 70px;
+    left: 25px;
+    border-bottom: 2px solid;
+    border-left: 2px solid;
+}
+
+.corner-bottom-right {
+    bottom: 70px;
+    right: 25px;
+    border-bottom: 2px solid;
+    border-right: 2px solid;
+}
+
+/* ==================== 信件内容样式 ==================== */
+.letter-header {
+    text-align: center;
+    margin-bottom: 60px;
+    position: relative;
+    z-index: 1;
+}
+
+.letter-title {
+    font-size: 48px;
+    color: #4a6b7c;
+    font-weight: 300;
+    letter-spacing: 12px;
+    margin-bottom: 20px;
+    font-family: 'STKaiti', 'KaiTi', 'STSong', serif;
+}
+
+.letter-subtitle {
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    color: #7a94a8;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+}
+
+/* 分隔线 */
+.divider {
+    width: 80px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #9fb4c7, transparent);
+    margin: 25px auto;
+}
+
+/* ==================== 音乐播放器 ==================== */
+.music-player {
+    margin: 40px auto 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+/* 播放按钮 */
+.play-button {
+    width: 48px;
+    height: 48px;
+    border: 2px solid rgba(159, 180, 199, 0.3);
+    background: rgba(159, 180, 199, 0.08);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.play-button:hover {
+    background: rgba(159, 180, 199, 0.15);
+    border-color: rgba(159, 180, 199, 0.5);
+    transform: scale(1.08);
+}
+
+.play-button:active {
+    transform: scale(0.95);
+}
+
+.play-icon,
+.pause-icon {
+    width: 20px;
+    height: 20px;
+    fill: #7a94a8;
+    transition: fill 0.3s ease;
+}
+
+.play-button:hover .play-icon,
+.play-button:hover .pause-icon {
+    fill: #4a6b7c;
+}
+
+/* 播放器文字标签 */
+.player-label {
+    font-size: 15px;
+    color: #7a94a8;
+    letter-spacing: 2px;
+    font-family: 'STKaiti', 'KaiTi', serif;
+    transition: color 0.3s ease;
+}
+
+.music-player:hover .player-label {
+    color: #4a6b7c;
+}
+
+/* 信件正文区域 */
+.letter-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* 段落样式 - 钢笔书写质感 */
+.letter-paragraph {
+    font-size: 19px;
+    line-height: 2.4;
+    color: #3d4e5a;
+    margin-bottom: 40px;
+    text-align: justify;
+    position: relative;
+    text-indent: 2em;
+}
+
+/* .letter-paragraph {
+    font-weight: 500;
+    color: #4a6b7c;
+} */
+
+/* 引用/诗句样式 */
+.letter-quote {
+    font-size: 22px;
+    line-height: 2;
+    color: #5a7a8c;
+    text-align: center;
+    padding: 40px 80px;
+    margin: 50px 0;
+    position: relative;
+    font-style: italic;
+    font-family: 'STKaiti', 'KaiTi', serif;
+}
+
+.letter-quote::before,
+.letter-quote::after {
+    content: '"';
+    font-size: 70px;
+    color: #9fb4c7;
+    opacity: 0.25;
+    position: absolute;
+    font-family: Georgia, serif;
+}
+
+.letter-quote::before {
+    top: 10px;
+    left: 30px;
+}
+
+.letter-quote::after {
+    bottom: -10px;
+    right: 30px;
+}
+
+/* 签名区域 */
+.letter-signature {
+    text-align: right;
+    margin-top: 70px;
+    color: #4a6b7c;
+    font-size: 20px;
+    font-family: 'STKaiti', 'KaiTi', serif;
+}
+
+.signature-name {
+    margin-top: 25px;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: 2px;
+}
+
+.signature-date {
+    font-size: 15px;
+    color: #7a94a8;
+    margin-top: 12px;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+}
+
+/* ==================== 装饰性插图 ==================== */
+/* 春天插图 - 左侧 */
+.illustration-spring {
+    position: absolute;
+    left: -60px;
+    top: 150px;
+    width: 180px;
+    height: 180px;
+    opacity: 0.12;
+    animation: float 7s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* 海啸插图 - 右侧 */
+.illustration-wave {
+    position: absolute;
+    right: -60px;
+    bottom: 150px;
+    width: 200px;
+    height: 180px;
+    opacity: 0.12;
+    animation: float 9s ease-in-out infinite 1.5s;
+    pointer-events: none;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-25px) rotate(2deg);
+    }
+}
+
+/* ==================== 打开次数统计 ==================== */
+.open-counter {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #9fb4c7;
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.counter-number {
+    font-weight: 600;
+    color: #4a6b7c;
+    font-size: 16px;
+    min-width: 70px;
+    text-align: center;
+    padding: 6px 16px;
+    background: rgba(159, 180, 199, 0.15);
+    border-radius: 4px;
+}
+
+/* 页脚彩蛋 */
+.footer-message {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: rgba(74, 107, 124, 0.6);
+    letter-spacing: 1px;
+    font-style: italic;
+    white-space: nowrap;
+}
+
+/* 淡入动画（用于段落滚动效果） */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 768px) {
+    .letter-container {
+        padding: 50px 35px 80px;
+        max-height: 85vh;
+    }
+    
+    /* 移动端滚动条样式 */
+    .letter-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .letter-title {
+        font-size: 36px;
+        letter-spacing: 6px;
+    }
+
+    .letter-subtitle {
+        font-size: 13px;
+        letter-spacing: 3px;
+    }
+
+    .letter-paragraph {
+        font-size: 17px;
+        line-height: 2.2;
+    }
+
+    .letter-quote {
+        font-size: 18px;
+        padding: 30px 40px;
+    }
+    
+    /* 移动端音乐播放器 */
+    .music-player {
+        margin: 30px auto 40px;
+        gap: 12px;
+    }
+    
+    .play-button {
+        width: 44px;
+        height: 44px;
+    }
+    
+    .play-icon,
+    .pause-icon {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .player-label {
+        font-size: 14px;
+        letter-spacing: 1.5px;
+    }
+
+    .letter-stamp {
+        width: 70px;
+        height: 85px;
+    }
+
+    .letter-stamp-inner {
+        font-size: 28px;
+    }
+
+    .illustration-spring,
+    .illustration-wave {
+        display: none;
+    }
+
+    .envelope-hint {
+        font-size: 12px;
+        bottom: -40px;
+    }
+
+    .footer-message {
+        font-size: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .letter-container {
+        padding: 40px 25px 70px;
+        max-height: 80vh;
+    }
+
+    .letter-title {
+        font-size: 28px;
+        letter-spacing: 4px;
+    }
+
+    .letter-paragraph {
+        font-size: 16px;
+    }
+
+    .letter-quote {
+        font-size: 16px;
+        padding: 25px 30px;
+    }
+}
+

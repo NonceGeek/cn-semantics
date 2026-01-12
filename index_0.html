@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>致你的一封信 | Letter for You</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600&family=Special+Elite&family=Courier+Prime&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background: linear-gradient(135deg, #e8f0f2 0%, #d5e5ea 50%, #c8dde5 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* 装饰性波浪背景 */
+        .wave-bg {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        /* 主容器 - 对称设计 */
+        .letter-container {
+            position: relative;
+            max-width: 900px;
+            width: 100%;
+            background: #fdfaf5;
+            box-shadow: 
+                0 0 0 1px rgba(139, 169, 179, 0.1),
+                0 20px 60px rgba(139, 169, 179, 0.3),
+                inset 0 0 100px rgba(255, 250, 240, 0.5);
+            border-radius: 4px;
+            padding: 60px 80px;
+            z-index: 1;
+            animation: fadeIn 1.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 复古纸张纹理 */
+        .letter-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139, 169, 179, 0.03) 2px, rgba(139, 169, 179, 0.03) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(139, 169, 179, 0.03) 2px, rgba(139, 169, 179, 0.03) 4px);
+            pointer-events: none;
+            border-radius: 4px;
+        }
+
+        /* 装饰性邮票 - 对称布局 */
+        .stamp {
+            position: absolute;
+            width: 80px;
+            height: 100px;
+            background: linear-gradient(135deg, #9fb4c7 0%, #7a94a8 100%);
+            border: 3px solid #fdfaf5;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 2;
+        }
+
+        .stamp-left {
+            top: -15px;
+            left: -15px;
+            transform: rotate(-8deg);
+        }
+
+        .stamp-right {
+            top: -15px;
+            right: -15px;
+            transform: rotate(8deg);
+        }
+
+        .stamp::after {
+            content: '';
+            position: absolute;
+            inset: 5px;
+            background: radial-gradient(circle, transparent 30%, rgba(253, 250, 245, 0.3) 31%, rgba(253, 250, 245, 0.3) 35%, transparent 36%);
+            background-size: 8px 8px;
+            background-position: -2px -2px;
+        }
+
+        /* 邮票内部图案 */
+        .stamp-inner {
+            position: absolute;
+            inset: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: rgba(253, 250, 245, 0.7);
+        }
+
+        /* 标题区域 */
+        .letter-header {
+            text-align: center;
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .letter-title {
+            font-size: 42px;
+            color: #4a6b7c;
+            font-weight: 300;
+            letter-spacing: 8px;
+            margin-bottom: 15px;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .letter-subtitle {
+            font-family: 'Courier Prime', monospace;
+            font-size: 14px;
+            color: #7a94a8;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* 装饰性分隔线 */
+        .divider {
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #9fb4c7, transparent);
+            margin: 30px auto;
+        }
+
+        /* 内容区域 */
+        .letter-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 春天插图 - 左侧对称 */
+        .illustration-spring {
+            position: absolute;
+            left: -40px;
+            top: 100px;
+            width: 150px;
+            height: 150px;
+            opacity: 0.15;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* 海啸插图 - 右侧对称 */
+        .illustration-wave {
+            position: absolute;
+            right: -40px;
+            bottom: 100px;
+            width: 180px;
+            height: 150px;
+            opacity: 0.15;
+            animation: float 8s ease-in-out infinite 1s;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        /* 段落样式 - 打字机效果 */
+        .letter-paragraph {
+            font-size: 18px;
+            line-height: 2.2;
+            color: #3d4e5a;
+            margin-bottom: 35px;
+            text-align: justify;
+            position: relative;
+            padding-left: 2em;
+            text-indent: 0;
+        }
+
+        .letter-paragraph::first-line {
+            font-weight: 600;
+            color: #4a6b7c;
+        }
+
+        /* 引用样式 */
+        .letter-quote {
+            font-family: 'Special Elite', cursive;
+            font-size: 20px;
+            line-height: 1.8;
+            color: #5a7a8c;
+            text-align: center;
+            padding: 30px 60px;
+            margin: 40px 0;
+            position: relative;
+            font-style: italic;
+        }
+
+        .letter-quote::before,
+        .letter-quote::after {
+            content: '"';
+            font-size: 60px;
+            color: #9fb4c7;
+            opacity: 0.3;
+            position: absolute;
+            font-family: Georgia, serif;
+        }
+
+        .letter-quote::before {
+            top: 0;
+            left: 20px;
+        }
+
+        .letter-quote::after {
+            bottom: -20px;
+            right: 20px;
+        }
+
+        /* 签名区域 */
+        .letter-signature {
+            text-align: right;
+            margin-top: 60px;
+            font-family: 'Courier Prime', cursive;
+            color: #4a6b7c;
+            font-size: 20px;
+        }
+
+        .signature-date {
+            font-size: 14px;
+            color: #7a94a8;
+            margin-top: 10px;
+            letter-spacing: 2px;
+        }
+
+        /* 访问计数器 - 对称底部 */
+        .visit-counter {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Courier Prime', monospace;
+            font-size: 12px;
+            color: #9fb4c7;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .counter-number {
+            font-weight: 600;
+            color: #4a6b7c;
+            font-size: 14px;
+            min-width: 60px;
+            text-align: center;
+            padding: 4px 12px;
+            background: rgba(159, 180, 199, 0.1);
+            border-radius: 3px;
+        }
+
+        /* 装饰性角落元素 */
+        .corner-decoration {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-color: #9fb4c7;
+            opacity: 0.3;
+        }
+
+        .corner-top-left {
+            top: 20px;
+            left: 20px;
+            border-top: 2px solid;
+            border-left: 2px solid;
+        }
+
+        .corner-top-right {
+            top: 20px;
+            right: 20px;
+            border-top: 2px solid;
+            border-right: 2px solid;
+        }
+
+        .corner-bottom-left {
+            bottom: 60px;
+            left: 20px;
+            border-bottom: 2px solid;
+            border-left: 2px solid;
+        }
+
+        .corner-bottom-right {
+            bottom: 60px;
+            right: 20px;
+            border-bottom: 2px solid;
+            border-right: 2px solid;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .letter-container {
+                padding: 40px 30px;
+            }
+
+            .letter-title {
+                font-size: 32px;
+                letter-spacing: 4px;
+            }
+
+            .letter-paragraph {
+                font-size: 16px;
+                padding-left: 0;
+            }
+
+            .letter-quote {
+                font-size: 16px;
+                padding: 20px 30px;
+            }
+
+            .stamp {
+                width: 60px;
+                height: 75px;
+            }
+
+            .illustration-spring,
+            .illustration-wave {
+                display: none;
+            }
+        }
+
+        /* 打字机效果动画 */
+        @keyframes typing {
+            from {
+                width: 0;
+            }
+        }
+
+        .typewriter-text {
+            overflow: hidden;
+            border-right: 2px solid #4a6b7c;
+            white-space: nowrap;
+            animation: typing 3.5s steps(40, end), blink-caret 0.75s step-end infinite;
+        }
+
+        @keyframes blink-caret {
+            from, to {
+                border-color: transparent;
+            }
+            50% {
+                border-color: #4a6b7c;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景波浪 -->
+    <svg class="wave-bg" viewBox="0 0 1200 200" preserveAspectRatio="none">
+        <path d="M0,100 C300,150 600,50 900,100 C1050,125 1200,100 1200,100 L1200,200 L0,200 Z" fill="#7a94a8"/>
+    </svg>
+
+    <!-- 主信件容器 -->
+    <div class="letter-container">
+        <!-- 装饰性邮票 -->
+        <div class="stamp stamp-left">
+            <div class="stamp-inner">🌸</div>
+        </div>
+        <div class="stamp stamp-right">
+            <div class="stamp-inner">🌊</div>
+        </div>
+
+        <!-- 角落装饰 -->
+        <div class="corner-decoration corner-top-left"></div>
+        <div class="corner-decoration corner-top-right"></div>
+        <div class="corner-decoration corner-bottom-left"></div>
+        <div class="corner-decoration corner-bottom-right"></div>
+
+        <!-- 春天插图 SVG -->
+        <svg class="illustration-spring" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+            <!-- 花朵 -->
+            <circle cx="75" cy="60" r="8" fill="#e8a5c4" opacity="0.6"/>
+            <circle cx="65" cy="55" r="8" fill="#e8a5c4" opacity="0.6"/>
+            <circle cx="85" cy="55" r="8" fill="#e8a5c4" opacity="0.6"/>
+            <circle cx="70" cy="45" r="8" fill="#e8a5c4" opacity="0.6"/>
+            <circle cx="80" cy="45" r="8" fill="#e8a5c4" opacity="0.6"/>
+            <circle cx="75" cy="50" r="6" fill="#f4d35e" opacity="0.8"/>
+            <!-- 茎 -->
+            <line x1="75" y1="60" x2="75" y2="120" stroke="#7a94a8" stroke-width="2" opacity="0.6"/>
+            <!-- 叶子 -->
+            <ellipse cx="65" cy="85" rx="12" ry="20" fill="#9fb4c7" opacity="0.5" transform="rotate(-30 65 85)"/>
+            <ellipse cx="85" cy="95" rx="12" ry="20" fill="#9fb4c7" opacity="0.5" transform="rotate(30 85 95)"/>
+        </svg>
+
+        <!-- 海啸插图 SVG -->
+        <svg class="illustration-wave" viewBox="0 0 180 150" xmlns="http://www.w3.org/2000/svg">
+            <!-- 波浪层次 -->
+            <path d="M0,80 Q30,60 60,80 T120,80 T180,80 L180,150 L0,150 Z" fill="#9fb4c7" opacity="0.3"/>
+            <path d="M0,90 Q40,70 80,90 T160,90 T180,90 L180,150 L0,150 Z" fill="#7a94a8" opacity="0.4"/>
+            <path d="M0,100 Q25,85 50,100 T100,100 T150,100 T180,100 L180,150 L0,150 Z" fill="#4a6b7c" opacity="0.5"/>
+            <!-- 波浪飞溅 -->
+            <circle cx="90" cy="75" r="3" fill="#7a94a8" opacity="0.6"/>
+            <circle cx="95" cy="70" r="2" fill="#7a94a8" opacity="0.6"/>
+            <circle cx="85" cy="72" r="2" fill="#7a94a8" opacity="0.6"/>
+        </svg>
+
+        <!-- 信件头部 -->
+        <div class="letter-header">
+            <h1 class="letter-title">致你的一封信</h1>
+            <div class="divider"></div>
+            <p class="letter-subtitle">A Letter For You</p>
+        </div>
+
+        <!-- 信件内容 -->
+        <div class="letter-content">
+            <p class="letter-paragraph">
+                亲爱的你，当你打开这封信的时候，我想让你知道，每一个字都是我用心写下的。就像春天的花朵慢慢绽放，像海浪一次次拍打着岸边，我的思绪也一遍遍地飞向你。
+            </p>
+
+            <p class="letter-paragraph">
+                生活就像一部法国新浪潮电影，充满了意外和惊喜。我们在时光的长河中相遇，在音乐的旋律中相知。每一次演出，每一首歌，都是我想要对你说的话。
+            </p>
+
+            <div class="letter-quote">
+                音乐是时间的诗，歌声是灵魂的信。<br>
+                而你，是我最想唱给这个世界听的旋律。
+            </div>
+
+            <p class="letter-paragraph">
+                我希望我的歌声能陪伴你度过每一个春夏秋冬，无论是阳光明媚的日子，还是风雨交加的夜晚。就像海啸过后依然会有平静，黑暗过后必然会迎来黎明。
+            </p>
+
+            <p class="letter-paragraph">
+                感谢你的每一次倾听，每一次支持。这封信不仅是我写给你的，也是你们所有人给我的力量的见证。让我们一起，在这个充满诗意和青春的时代里，勇敢地追逐梦想。
+            </p>
+
+            <div class="letter-signature">
+                <div>永远爱你的</div>
+                <div style="margin-top: 20px; font-size: 24px;">音乐人</div>
+                <div class="signature-date">2025.12.30</div>
+            </div>
+        </div>
+
+        <!-- 访问计数器 -->
+        <div class="visit-counter">
+            <span>这封信已被打开</span>
+            <span class="counter-number" id="visitCount">0</span>
+            <span>次</span>
+        </div>
+    </div>
+
+    <script>
+        // 访问计数功能
+        function updateVisitCount() {
+            // 从 localStorage 获取当前计数
+            let count = localStorage.getItem('letterVisitCount');
+            
+            if (count === null) {
+                count = 0;
+            } else {
+                count = parseInt(count);
+            }
+            
+            // 增加计数
+            count++;
+            
+            // 保存新的计数
+            localStorage.setItem('letterVisitCount', count);
+            
+            // 显示计数（带动画效果）
+            const counterElement = document.getElementById('visitCount');
+            let currentDisplay = 0;
+            const increment = Math.ceil(count / 30);
+            
+            const timer = setInterval(() => {
+                currentDisplay += increment;
+                if (currentDisplay >= count) {
+                    currentDisplay = count;
+                    clearInterval(timer);
+                }
+                counterElement.textContent = currentDisplay.toLocaleString();
+            }, 30);
+        }
+
+        // 页面加载时更新计数
+        window.addEventListener('load', updateVisitCount);
+
+        // 添加一些交互效果
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为段落添加淡入效果
+            const paragraphs = document.querySelectorAll('.letter-paragraph');
+            
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -100px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'fadeIn 1s ease-out forwards';
+                    }
+                });
+            }, observerOptions);
+
+            paragraphs.forEach(p => {
+                p.style.opacity = '0';
+                observer.observe(p);
+            });
+
+            // 鼠标移动时的视差效果
+            document.addEventListener('mousemove', (e) => {
+                const moveX = (e.clientX - window.innerWidth / 2) * 0.01;
+                const moveY = (e.clientY - window.innerHeight / 2) * 0.01;
+                
+                const spring = document.querySelector('.illustration-spring');
+                const wave = document.querySelector('.illustration-wave');
+                
+                if (spring) {
+                    spring.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                }
+                if (wave) {
+                    wave.style.transform = `translate(${-moveX}px, ${-moveY}px)`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
