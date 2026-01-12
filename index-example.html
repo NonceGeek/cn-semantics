@@ -1,0 +1,815 @@
+import React, { useState, useMemo, useRef } from 'react';
+import { Search, FileText, Download, Mail, Database, Info, ChevronRight, BookOpen, Layers, Type, LayoutGrid, CircleDot } from 'lucide-react';
+
+/**
+ * 示例数据 - 仅用于演示
+ */
+const DEMO_DATA = [
+  { level: "2", word: "不好意思2", l1: "生物活动", l2: "表情", l3: "传情", l4: "害羞" },
+  { level: "7", word: "害臊", l1: "生物活动", l2: "表情", l3: "传情", l4: "害羞" },
+  { level: "7", word: "害羞", l1: "生物活动", l2: "表情", l3: "传情", l4: "害羞" },
+  { level: "7", word: "面红耳赤", l1: "生物活动", l2: "表情", l3: "传情", l4: "害羞" },
+  { level: "6", word: "泡1", l1: "具体物", l2: "自然事物", l3: "自然物质", l4: "水" },
+  { level: "6", word: "波浪", l1: "具体物", l2: "自然事物", l3: "自然物质", l4: "水" },
+  { level: "6", word: "洪水", l1: "具体物", l2: "自然事物", l3: "自然物质", l4: "水" },
+  { level: "6", word: "泡4", l1: "具体物", l2: "自然事物", l3: "流动浸泡", l4: "浸泡淹没" },
+  { level: "7", word: "浸泡", l1: "具体物", l2: "自然事物", l3: "流动浸泡", l4: "浸泡淹没" },
+  { level: "7", word: "涌1", l1: "具体物", l2: "自然事物", l3: "流动浸泡", l4: "浸泡淹没" },
+  { level: "1", word: "水", l1: "具体物", l2: "自然事物", l3: "自然物质", l4: "水" },
+  { level: "2", word: "河", l1: "具体物", l2: "自然事物", l3: "自然物质", l4: "水" },
+  { level: "4", word: "垃圾", l1: "具体物", l2: "事物总称", l3: "商品物品", l4: "废弃物" },
+  { level: "7", word: "废品", l1: "具体物", l2: "事物总称", l3: "商品物品", l4: "废弃物" },
+];
+
+/**
+ * 辅助函数：获取等级排序权重
+ * 用于实现“难度等级由低到高”的排序逻辑 (板块内部排序)
+ */
+const getLevelSortWeight = (level) => {
+  const map = {
+    '1': 1, '2': 2, '3': 3, '4': 4,
+    '5': 5, '6': 6, '7': 7, '增补': 8
+  };
+  return map[level] || 99;
+};
+
+/**
+ * 辅助函数：获取词语后缀数字权重
+ * 用于实现“W1, W2, W3”的排序逻辑 (板块之间排序)
+ * 例如："泡1" -> 1, "泡4" -> 4, "水" -> 0 (无数字优先)
+ */
+const getWordSuffixValue = (word) => {
+  const match = word.match(/(\d+)$/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 0; // 没有数字的词排在最前或最后，这里设为0排在最前
+};
+
+/**
+ * 辅助函数：统一的等级颜色逻辑
+ */
+const getSharedLevelColor = (level) => {
+  switch(level) {
+    case '1': 
+    case '2': 
+      return 'bg-green-100 text-green-700 border-green-200';
+    case '3': 
+    case '4': 
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    case '5': 
+    case '6': 
+      return 'bg-orange-100 text-orange-700 border-orange-200';
+    case '7': 
+      return 'bg-red-100 text-red-700 border-red-200';
+    case '增补': 
+      return 'bg-purple-100 text-purple-700 border-purple-200';
+    default: 
+      return 'bg-gray-100 text-gray-600 border-gray-200';
+  }
+};
+
+const App = () => {
+  const [data, setData] = useState(DEMO_DATA);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); 
+  const [searchType, setSearchType] = useState('word'); 
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); 
+
+  // CSV 文件导入解析器
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const lines = text.split('\n');
+      const parsedData = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const columns = line.split(',');
+        
+        if (columns.length >= 6) {
+          parsedData.push({
+            level: columns[0].trim(),
+            word: columns[1].trim(),
+            l1: columns[2].trim(),
+            l2: columns[3].trim(),
+            l3: columns[4].trim(),
+            l4: columns[5].trim(),
+          });
+        }
+      }
+      setData(parsedData);
+      setIsDataLoaded(true);
+      setLoading(false);
+      alert(`成功导入 ${parsedData.length} 条词条数据！`);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleSearch = () => {
+    if (!query.trim()) {
+      setResults(null);
+      return;
+    }
+
+    setLoading(true);
+    const q = query.trim();
+
+    setTimeout(() => {
+      if (searchType === 'word') {
+        performWordSearch(q);
+      } else {
+        performCategorySearch(q);
+      }
+      setLoading(false);
+      setViewMode('list'); 
+    }, 300);
+  };
+
+  const performWordSearch = (inputWord) => {
+    const escapedInput = inputWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escapedInput}\\d*$`); 
+
+    const targetWords = data.filter(item => regex.test(item.word));
+
+    if (targetWords.length === 0) {
+      setResults({ type: 'word', found: false, items: [] });
+      return;
+    }
+
+    // 1. 对检索到的目标词进行排序 (W1 -> W2 -> W3)
+    targetWords.sort((a, b) => getWordSuffixValue(a.word) - getWordSuffixValue(b.word));
+
+    const relatedL3 = new Set();
+    const relatedL4 = new Set();
+    const targetWordList = [];
+
+    // 2. 根据排序后的目标词，依序提取义类
+    const orderedL3Keys = [];
+    const orderedL4Keys = [];
+
+    targetWords.forEach(target => {
+      targetWordList.push(target);
+      
+      // 保持 L3 出现顺序
+      if (!relatedL3.has(target.l3)) {
+        relatedL3.add(target.l3);
+        orderedL3Keys.push(target.l3);
+      }
+      
+      // 保持 L4 出现顺序 (确保图表和列表都按 W1, W2 顺序展示)
+      if (!relatedL4.has(target.l4)) {
+        relatedL4.add(target.l4);
+        orderedL4Keys.push(target.l4);
+      }
+    });
+
+    const l3Matches = {};
+    const l4Matches = {};
+    let allRelatedWords = [];
+
+    relatedL3.forEach(cat => l3Matches[cat] = []);
+    relatedL4.forEach(cat => l4Matches[cat] = []);
+
+    data.forEach(item => {
+      if (relatedL3.has(item.l3)) {
+        l3Matches[item.l3].push(item);
+        if(!allRelatedWords.includes(item)) allRelatedWords.push(item);
+      }
+      if (relatedL4.has(item.l4)) {
+        l4Matches[item.l4].push(item);
+        if(!allRelatedWords.includes(item)) allRelatedWords.push(item);
+      }
+    });
+
+    // 3. 对每个板块内的词语进行难度等级排序 (1->7->增补)
+    Object.keys(l3Matches).forEach(key => {
+      l3Matches[key].sort((a, b) => getLevelSortWeight(a.level) - getLevelSortWeight(b.level));
+    });
+    Object.keys(l4Matches).forEach(key => {
+      l4Matches[key].sort((a, b) => getLevelSortWeight(a.level) - getLevelSortWeight(b.level));
+    });
+    
+    allRelatedWords.sort((a, b) => getLevelSortWeight(a.level) - getLevelSortWeight(b.level));
+
+    setResults({
+      type: 'word',
+      found: true,
+      targets: targetWordList,
+      l3Data: l3Matches,
+      l4Data: l4Matches,
+      orderedL3Keys: orderedL3Keys, // 传递有序的 L3 键
+      orderedL4Keys: orderedL4Keys, // 传递有序的 L4 键
+      allItems: allRelatedWords,
+      mainLabel: targetWords[0].l4 
+    });
+  };
+
+  const performCategorySearch = (categoryName) => {
+    const matches = data.filter(item => 
+      item.l1.includes(categoryName) || 
+      item.l2.includes(categoryName) || 
+      item.l3.includes(categoryName) || 
+      item.l4.includes(categoryName)
+    );
+
+    const grouped = {};
+    const orderedPaths = []; // 用于义类检索的有序路径
+    
+    // 简单按难度排序整个匹配列表
+    matches.sort((a, b) => getLevelSortWeight(a.level) - getLevelSortWeight(b.level));
+
+    matches.forEach(item => {
+      const path = `${item.l1} > ${item.l2} > ${item.l3} > ${item.l4}`;
+      if (!grouped[path]) {
+        grouped[path] = [];
+        orderedPaths.push(path);
+      }
+      grouped[path].push(item);
+    });
+
+    setResults({
+      type: 'category',
+      found: matches.length > 0,
+      count: matches.length,
+      groupedData: grouped,
+      orderedPaths: orderedPaths,
+      allItems: matches, 
+      mainLabel: categoryName 
+    });
+  };
+
+  const handleDownload = (fileName) => {
+    alert(`【系统提示】\n正在请求下载文件：\n${fileName}\n\n（文件将从服务器获取并开始下载）`);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      {/* 顶部导航栏 */}
+      <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg text-white">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 tracking-tight">国际中文教育词汇义类资源检索平台</h1>
+              <p className="text-xs text-slate-500">基于《等级标准》构建的智能语义检索系统</p>
+            </div>
+          </div>
+          
+          <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+            <a href="#search" className="hover:text-blue-600 transition-colors">资源检索</a>
+            <a href="#download" className="hover:text-blue-600 transition-colors">资料下载</a>
+            <a href="#feedback" className="hover:text-blue-600 transition-colors">意见反馈</a>
+          </nav>
+        </div>
+      </header>
+
+      {/* 主体区域 */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" id="search">
+        
+        {!isDataLoaded && (
+          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Info className="text-blue-600 mt-1 flex-shrink-0" size={20} />
+              <div>
+                <h3 className="font-semibold text-blue-900">系统就绪 (演示模式)</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  当前加载了部分示例数据。如需检索完整数据库，请点击右侧按钮导入您的 <b>CSV 数据文件</b>。
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-all shadow-sm font-medium text-sm flex-shrink-0">
+              <Database size={16} />
+              导入完整数据 (.csv)
+              <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
+        )}
+
+        {/* 搜索框区域 */}
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+          <div className="bg-slate-900 px-6 py-8 sm:px-10 text-center sm:text-left">
+            <h2 className="text-2xl font-semibold text-white mb-2">词汇义类检索</h2>
+            <p className="text-slate-400 text-sm">支持按词语反查义类，或按义类名称批量检索</p>
+          </div>
+
+          <div className="p-6 sm:p-10">
+            {/* 切换 Tab */}
+            <div className="flex gap-4 mb-6 border-b border-slate-200 pb-2">
+              <button 
+                onClick={() => { setSearchType('word'); setResults(null); }}
+                className={`pb-2 px-1 text-sm font-medium flex items-center gap-2 transition-all border-b-2 ${searchType === 'word' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+              >
+                <Type size={18} />
+                按词语检索
+              </button>
+              <button 
+                onClick={() => { setSearchType('category'); setResults(null); }}
+                className={`pb-2 px-1 text-sm font-medium flex items-center gap-2 transition-all border-b-2 ${searchType === 'category' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+              >
+                <Layers size={18} />
+                按义类检索
+              </button>
+            </div>
+
+            {/* 输入框 */}
+            <div className="relative max-w-3xl">
+              <input 
+                type="text" 
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder={searchType === 'word' ? "请输入词语，如：害羞、波浪..." : "请输入义类名称，如：表情、自然物质..."}
+                className="w-full pl-12 pr-32 py-4 bg-slate-50 border border-slate-200 rounded-xl text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={22} />
+              <button 
+                onClick={handleSearch}
+                disabled={loading}
+                className="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-lg font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading ? '检索中...' : '搜索'}
+              </button>
+            </div>
+            <div className="mt-3 text-xs text-slate-400">
+              {searchType === 'word' && "提示：系统会自动识别词语后的数字编号"}
+              {searchType === 'category' && "提示：输入任意一至四级义类名称均可匹配"}
+            </div>
+          </div>
+        </div>
+
+        {/* 搜索结果展示区 */}
+        {results && (
+          <div className="mt-8 animate-fadeIn">
+            
+            {/* 结果头部与视图切换按钮 */}
+            {results.found && (
+              <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-6 gap-4">
+                <h3 className="text-xl font-bold text-slate-800">
+                  {results.type === 'word' ? '检索结果' : `检索到 ${results.count} 个相关词语`}
+                </h3>
+                <div className="flex bg-slate-200 p-1 rounded-lg">
+                  <button 
+                    onClick={() => setViewMode('list')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <LayoutGrid size={16} />
+                    列表视图
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('graph')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'graph' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <CircleDot size={16} />
+                    义类星图
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 无结果提示 */}
+            {(!results.found) && (
+              <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                <div className="mx-auto w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                  <Search className="text-slate-400" size={28} />
+                </div>
+                <h3 className="text-lg font-medium text-slate-900">未找到相关结果</h3>
+                <p className="text-slate-500 mt-1">请尝试更换关键词。</p>
+              </div>
+            )}
+
+            {/* 视图 1：列表视图 */}
+            {results.found && viewMode === 'list' && (
+              <div className="animate-fadeIn">
+                {results.type === 'word' ? (
+                  <div className="space-y-8">
+                     {/* 目标词信息 */}
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                        <Info size={16} /> 检索词信息
+                      </h3>
+                      <div className="flex flex-wrap gap-3">
+                        {/* 这里的 targets 已经按 1, 2, 3 排序 */}
+                        {results.targets.map((t, idx) => (
+                          <div key={idx} className="flex flex-col bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xl font-bold text-slate-900">{t.word}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSharedLevelColor(t.level)}`}>等级 {t.level}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                              <span className="text-blue-600 font-medium">{t.l3}</span> <ChevronRight size={12}/>
+                              <span className="text-indigo-600 font-medium">{t.l4}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 三级义类结果 - 使用 orderedL3Keys 保证顺序 */}
+                    {results.orderedL3Keys.map((category) => {
+                      const items = results.l3Data[category];
+                      return (
+                        <div key={category} className="mb-6 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                           <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
+                            <span className="font-semibold text-blue-900">三级义类：{category}</span>
+                            <span className="text-xs text-blue-600 bg-white px-2 py-1 rounded-md border border-blue-200">{items.length} 个词语</span>
+                          </div>
+                          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {items.map((item, idx) => <WordCard key={idx} item={item} highlightL3 />)}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* 四级义类结果 - 使用 orderedL4Keys 保证顺序 */}
+                    {results.orderedL4Keys.map((category) => {
+                       const items = results.l4Data[category];
+                       return (
+                        <div key={category} className="mb-6 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                           <div className="bg-indigo-50 px-4 py-3 border-b border-indigo-100 flex justify-between items-center">
+                            <span className="font-semibold text-indigo-900">四级义类：{category}</span>
+                            <span className="text-xs text-indigo-600 bg-white px-2 py-1 rounded-md border border-indigo-200">{items.length} 个词语</span>
+                          </div>
+                          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {items.map((item, idx) => <WordCard key={idx} item={item} highlightL4 />)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* 义类检索模式的结果列表 */}
+                    {results.orderedPaths.map((path) => {
+                      const items = results.groupedData[path];
+                      return (
+                        <div key={path} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 text-sm text-slate-600 font-medium flex items-center gap-2">
+                            <Layers size={16} />
+                            {path}
+                          </div>
+                          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {items.map((item, idx) => <WordCard key={idx} item={item} />)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 视图 2：义类星图视图 (可视化) */}
+            {results.found && viewMode === 'graph' && (
+               <div className="space-y-8 animate-fadeIn">
+                 {/* 如果是词语检索，按 W1, W2 的顺序展示四级义类图 */}
+                 {searchType === 'word' ? (
+                   results.orderedL4Keys.map((category, idx) => {
+                     const items = results.l4Data[category];
+                     // 找出属于该义类的检索目标词，用于显示在标题下
+                     const matchedTargets = results.targets.filter(t => t.l4 === category).map(t => t.word).join('、');
+                     
+                     return (
+                       <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 overflow-hidden relative">
+                         <div className="text-center mb-4">
+                           <h3 className="font-bold text-slate-800">“{category}”义类词汇辐射图</h3>
+                           {matchedTargets && (
+                             <div className="text-xs text-blue-600 mt-1 font-medium bg-blue-50 inline-block px-2 py-1 rounded">
+                               包含检索词: {matchedTargets}
+                             </div>
+                           )}
+                         </div>
+                         <RadialGraph words={items} centerLabel={category} />
+                       </div>
+                     );
+                   })
+                 ) : (
+                   /* 义类检索模式 */
+                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 overflow-hidden relative">
+                     <div className="text-center mb-4">
+                       <h3 className="font-bold text-slate-800">“{results.mainLabel || query}”词汇难度辐射图</h3>
+                       <p className="text-xs text-slate-500">由内向外：难度等级 1 → 7/增补</p>
+                     </div>
+                     <RadialGraph words={results.allItems} centerLabel={results.mainLabel || query} />
+                   </div>
+                 )}
+               </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* 资源下载专区 */}
+      <section id="download" className="bg-slate-100 py-16 border-t border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 text-center md:text-left">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">资源下载</h2>
+            <p className="text-slate-500">
+              请下载最新的《等级标准》配套文件，助力教学与研究。
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* 文件 1: 使用指南 */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex items-start gap-4">
+              <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
+                <BookOpen size={28} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-slate-900 text-lg mb-1">使用指南</h3>
+                <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                  包含平台使用说明及义类体系介绍
+                </p>
+                <button 
+                  onClick={() => handleDownload("国际中文教育词汇义类资源检索平台-使用指南.pdf")}
+                  className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  <Download size={16} />
+                  下载 PDF (使用指南)
+                </button>
+              </div>
+            </div>
+
+            {/* 文件 2: 完整词语表 */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex items-start gap-4">
+              <div className="bg-green-100 p-3 rounded-lg text-green-600">
+                <Database size={28} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-slate-900 text-lg mb-1">词语表类义词群</h3>
+                <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                  完整版《等级标准》义类词汇数据
+                </p>
+                <button 
+                  onClick={() => handleDownload("完整版-《等级标准》词语表类义词群.pdf")}
+                  className="flex items-center gap-2 text-sm font-semibold text-green-600 hover:text-green-800 transition-colors"
+                >
+                  <Download size={16} />
+                  下载 PDF (完整词表)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 底部与反馈 */}
+      <footer id="feedback" className="bg-slate-900 text-slate-300 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-8">
+          <div>
+            <h4 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
+              <Mail size={20} /> 意见与反馈
+            </h4>
+            <p className="mb-4 text-slate-400">
+              如果您在使用过程中发现数据错误、系统故障或有任何改进建议，欢迎随时联系我们。您的反馈对我们完善资源至关重要。
+            </p>
+            <a 
+              href="mailto:liury@gzhu.edu.cn" 
+              className="inline-flex items-center gap-2 text-white bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+            >
+              liury@gzhu.edu.cn
+            </a>
+          </div>
+          <div className="text-right flex flex-col justify-between">
+             <div className="text-sm text-slate-500">
+               国际中文教育资源库项目组 <br/>
+               © 2024 All Rights Reserved.
+             </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+// 子组件：单词卡片
+const WordCard = ({ item, highlightL3, highlightL4 }) => {
+  return (
+    <div className="group relative bg-white border border-slate-200 hover:border-blue-400 rounded-lg p-3 transition-all hover:shadow-md cursor-default">
+      <div className="flex justify-between items-start mb-2">
+        <span className="font-bold text-slate-800 text-lg truncate w-full" title={item.word}>{item.word}</span>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ml-1 ${getSharedLevelColor(item.level)}`}>
+          Lv.{item.level}
+        </span>
+      </div>
+      
+      <div className="text-xs text-slate-500 space-y-1">
+        <div className={`truncate ${highlightL3 ? 'text-blue-600 font-medium' : ''}`}>
+          L3: {item.l3}
+        </div>
+        <div className={`truncate ${highlightL4 ? 'text-indigo-600 font-medium' : ''}`}>
+          L4: {item.l4}
+        </div>
+      </div>
+
+      <div className="absolute opacity-0 group-hover:opacity-100 bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-slate-800 text-white text-xs p-2 rounded pointer-events-none z-10 transition-opacity shadow-lg">
+        {item.l1} &gt; {item.l2} &gt; {item.l3} &gt; {item.l4}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+      </div>
+    </div>
+  );
+};
+
+// 子组件：同心圆辐射图 (Radial Graph)
+const RadialGraph = ({ words, centerLabel }) => {
+  const [tooltip, setTooltip] = useState(null); // { x, y, content }
+  const canvasSize = 800; // SVG canvas size
+  const center = canvasSize / 2;
+  
+  // 难度等级映射到半径 (r)
+  const levelMap = {
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '增补': 8
+  };
+  const maxLevels = 8;
+  const step = (center - 100) / maxLevels; // 100 is center buffer
+
+  // 1. 将词汇按等级分组
+  const groupedByLevel = useMemo(() => {
+    const groups = {};
+    for(let i=1; i<=8; i++) groups[i] = [];
+    
+    words.forEach(w => {
+      let lIdx = levelMap[w.level] || 8;
+      groups[lIdx].push(w);
+    });
+    return groups;
+  }, [words]);
+
+  // 低饱和度颜色映射 (Low Saturation, High Brightness/Value)
+  const getLevelColor = (idx) => {
+    // Pastel / Muted Colors
+    if (idx <= 2) return '#86efac'; // Green-300
+    if (idx <= 4) return '#93c5fd'; // Blue-300
+    if (idx <= 6) return '#fdba74'; // Orange-300
+    return '#fca5a5'; // Red-300 (Lv 7)
+    // idx 8 (Supp) handled in render if needed, or fallback to purple
+  };
+  
+  // Tooltip Logic
+  const handleMouseEnter = (e, item, type = 'node') => {
+    const rect = e.target.getBoundingClientRect();
+    const containerRect = e.target.closest('.relative').getBoundingClientRect();
+    
+    setTooltip({
+      x: rect.left - containerRect.left + rect.width / 2,
+      y: rect.top - containerRect.top,
+      item: item,
+      type: type
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip(null);
+  };
+
+  // 生成图例数据
+  const legends = [
+    { label: '等级 1-2', color: getLevelColor(1) },
+    { label: '等级 3-4', color: getLevelColor(3) },
+    { label: '等级 5-6', color: getLevelColor(5) },
+    { label: '等级 7', color: getLevelColor(7) },
+    { label: '增补', color: '#d8b4fe' },
+  ];
+
+  return (
+    <div className="w-full overflow-x-auto flex justify-center relative cursor-default">
+      
+      {/* 2. 图例说明 - 右上角 */}
+      <div className="absolute top-2 right-2 sm:right-10 bg-white/90 p-3 rounded-lg border border-slate-200 shadow-sm z-10">
+        <h4 className="text-xs font-bold text-slate-600 mb-2">难度等级图例</h4>
+        <div className="flex flex-col gap-1.5">
+          {legends.map((legend, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full border border-slate-100" style={{ backgroundColor: legend.color }}></span>
+              <span className="text-[10px] text-slate-500 font-medium">{legend.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <svg width={canvasSize} height={canvasSize} viewBox={`0 0 ${canvasSize} ${canvasSize}`} className="max-w-full h-auto select-none">
+        {/* 背景同心圆环 */}
+        {[...Array(maxLevels)].map((_, i) => {
+          const r = (i + 1) * step + 50;
+          return (
+            <g key={i}>
+              <circle cx={center} cy={center} r={r} fill="none" stroke="#e2e8f0" strokeWidth="1.5" />
+            </g>
+          );
+        })}
+
+        {/* 渲染词汇节点 */}
+        {Object.entries(groupedByLevel).map(([levelIdx, items]) => {
+          const r = parseInt(levelIdx) * step + 50;
+          const count = items.length;
+          if (count === 0) return null;
+
+          return items.map((item, idx) => {
+            const angle = (idx / count) * 2 * Math.PI - (Math.PI / 2); // Start from top
+            const x = center + r * Math.cos(angle);
+            const y = center + r * Math.sin(angle);
+            const color = parseInt(levelIdx) === 8 ? '#d8b4fe' : getLevelColor(parseInt(levelIdx));
+
+            return (
+              <g 
+                key={`${item.word}-${idx}`} 
+                className="group hover:opacity-100 transition-opacity"
+                onMouseEnter={(e) => handleMouseEnter(e, item)}
+                onMouseLeave={handleMouseLeave}
+              >
+                {/* 节点实心圆 */}
+                <circle 
+                  cx={x} 
+                  cy={y} 
+                  r={11} 
+                  fill={color}
+                  stroke="white" 
+                  strokeWidth="2" 
+                  className="transition-all hover:r-[14px] hover:stroke-slate-200" 
+                />
+                
+                {/* 词语文本 (只显示前几个字，完整信息看Tooltip) */}
+                <text 
+                  x={x} 
+                  y={y + 22} 
+                  textAnchor="middle" 
+                  fontSize="11" 
+                  fill="#475569" 
+                  fontWeight="500"
+                  className="pointer-events-none"
+                >
+                  {item.word.replace(/\d+$/, '').substring(0, 4)}
+                </text>
+              </g>
+            );
+          });
+        })}
+
+        {/* 中心节点 */}
+        <g
+          onMouseEnter={(e) => handleMouseEnter(e, { word: centerLabel, level: '核心', l4: '义类中心' }, 'center')}
+          onMouseLeave={handleMouseLeave}
+          style={{ cursor: 'pointer' }}
+        >
+          <circle cx={center} cy={center} r={60} fill="#2563EB" stroke="white" strokeWidth="4" className="shadow-lg" />
+          <text 
+            x={center} 
+            y={center} 
+            dy=".3em" 
+            textAnchor="middle" 
+            fill="white" 
+            fontWeight="bold" 
+            fontSize="20"
+            style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+          >
+            {centerLabel.length > 4 ? centerLabel.substring(0,4)+'...' : centerLabel}
+          </text>
+        </g>
+      </svg>
+
+      {/* 自定义悬浮 Tooltip */}
+      {tooltip && (
+        <div 
+          className="absolute z-20 bg-white p-3 rounded-lg shadow-xl border border-slate-200 pointer-events-none animate-fadeIn flex flex-col gap-1 min-w-[140px]"
+          style={{ 
+            left: tooltip.x, 
+            top: tooltip.y, 
+            transform: 'translate(-50%, -110%)' 
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+             <span className="font-bold text-slate-800 text-base">{tooltip.item.word}</span>
+             {tooltip.item.level && (
+               <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-bold">
+                 Lv.{tooltip.item.level}
+               </span>
+             )}
+          </div>
+          <div className="text-xs text-slate-500">
+            {tooltip.item.l4 && (
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                <span className="font-medium text-indigo-600">{tooltip.item.l4}</span>
+              </div>
+            )}
+            {tooltip.item.l3 && <div className="pl-2.5 mt-0.5 text-slate-400">所属: {tooltip.item.l3}</div>}
+          </div>
+          {/* 小三角箭头 */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-sm"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
