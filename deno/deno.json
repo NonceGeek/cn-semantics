@@ -1,7 +1,7 @@
 {
   "tasks": {
     "dev": "deno run --watch -A main.tsx",
-    "deploy": "deployctl deploy --prod --project=letter-yyk main.tsx"
+    "deploy": "deployctl deploy --prod --project=cn-semantics main.tsx"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
