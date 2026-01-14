@@ -276,39 +276,59 @@ function SearchSection() {
     return exactMatch || searchResults.data[0]
   }
 
-  // Calculate positions for words in concentric circles
+  // Calculate positions for words in concentric circles by difficulty level
+  // 8 rings: level 1-7 and null (增补) radiating outward from center
   const calculateWordPositions = (words, centerX, centerY) => {
     if (!words || words.length === 0) return []
     
-    const rings = [
-      { radius: 80, maxWords: 3 },
-      { radius: 140, maxWords: 6 },
-      { radius: 200, maxWords: 12 },
-      { radius: 260, maxWords: 20 }
-    ]
+    // Define 8 rings for difficulty levels 1-7 and null (增补)
+    // Ring radius increases as difficulty increases (40px spacing between rings)
+    const levelToRing = {
+      1: { radius: 90, level: 1 },
+      2: { radius: 130, level: 2 },
+      3: { radius: 170, level: 3 },
+      4: { radius: 210, level: 4 },
+      5: { radius: 250, level: 5 },
+      6: { radius: 290, level: 6 },
+      7: { radius: 330, level: 7 },
+      null: { radius: 370, level: null } // 增补 at outermost ring
+    }
+
+    // Group words by difficulty level
+    const wordsByLevel = {}
+    words.forEach(word => {
+      const level = word.difficulty_level
+      const key = level === null ? 'null' : level
+      if (!wordsByLevel[key]) {
+        wordsByLevel[key] = []
+      }
+      wordsByLevel[key].push(word)
+    })
 
     const positions = []
-    let wordIndex = 0
 
-    for (let ringIndex = 0; ringIndex < rings.length && wordIndex < words.length; ringIndex++) {
-      const ring = rings[ringIndex]
-      const wordsInRing = Math.min(ring.maxWords, words.length - wordIndex)
-      const angleStep = (2 * Math.PI) / wordsInRing
+    // Process each level and position words on their respective ring
+    Object.entries(levelToRing).forEach(([levelKey, ringInfo]) => {
+      const key = levelKey === 'null' ? 'null' : parseInt(levelKey)
+      const wordsInLevel = wordsByLevel[key] || wordsByLevel[levelKey] || []
+      
+      if (wordsInLevel.length === 0) return
 
-      for (let i = 0; i < wordsInRing && wordIndex < words.length; i++) {
-        const angle = i * angleStep - Math.PI / 2 // Start from top
-        const x = centerX + ring.radius * Math.cos(angle)
-        const y = centerY + ring.radius * Math.sin(angle)
+      const angleStep = (2 * Math.PI) / wordsInLevel.length
+      
+      wordsInLevel.forEach((word, index) => {
+        const angle = index * angleStep - Math.PI / 2 // Start from top
+        const x = centerX + ringInfo.radius * Math.cos(angle)
+        const y = centerY + ringInfo.radius * Math.sin(angle)
         
         positions.push({
-          word: words[wordIndex],
+          word,
           x,
           y,
           angle
         })
-        wordIndex++
-      }
-    }
+      })
+    })
 
     return positions
   }
@@ -318,8 +338,9 @@ function SearchSection() {
     if (!items || items.length === 0) return null
 
     const sortedItems = sortByDifficulty(items)
-    const centerX = 300
-    const centerY = 300
+    // HINT: centerX and centerY are the center of the star map.
+    const centerX = 450
+    const centerY = 450
     const positions = calculateWordPositions(sortedItems, centerX, centerY)
 
     // Get the level_4 category for this level_3
@@ -334,46 +355,43 @@ function SearchSection() {
           )}
         </div>
 
-        <div className="star-map-legend">
-          <div className="legend-title">难度等级图例</div>
-          <div className="legend-items">
-            <div className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: '#10b981' }}></span>
-              <span>等级 1-2</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: '#2563eb' }}></span>
-              <span>等级 3-4</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
-              <span>等级 5-6</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: '#ef4444' }}></span>
-              <span>等级 7</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-dot" style={{ backgroundColor: '#a855f7' }}></span>
-              <span>增补</span>
+        <div className="star-map-svg-container">
+          <div className="star-map-legend">
+            <div className="legend-title">难度等级图例</div>
+            <div className="legend-items">
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#10b981' }}></span>
+                <span>等级 1-2</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#2563eb' }}></span>
+                <span>等级 3-4</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+                <span>等级 5-6</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#ef4444' }}></span>
+                <span>等级 7</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#a855f7' }}></span>
+                <span>增补</span>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="star-map-svg-container">
-          <svg width="600" height="600" className="star-map-svg">
-            {/* Draw concentric circles */}
-            {[80, 140, 200, 260].map((radius, i) => (
+          <svg width="1000" height="1000" className="star-map-svg">
+            {/* Draw concentric circles - 8 rings for difficulty levels 1-7 and null */}
+            {[90, 130, 170, 210, 250, 290, 330, 370].map((radius, i) => (
               <circle
                 key={`ring-${i}`}
                 cx={centerX}
                 cy={centerY}
                 r={radius}
                 fill="none"
-                stroke="#e5e7eb"
+                stroke="#d1d5db"
                 strokeWidth="1"
-                strokeDasharray="2,2"
-                opacity="0.5"
               />
             ))}
 
@@ -405,6 +423,45 @@ function SearchSection() {
               </text>
             </g>
 
+            {/* Word nodes - render all circles and text first */}
+            {positions.map((pos, index) => {
+              const item = pos.word
+              const color = getDifficultyColor(item.difficulty_level)
+              const isHovered = hoveredWord?.id === item.id
+
+              return (
+                <g key={item.id}>
+                  {/* Word circle */}
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={isHovered ? "14" : "11"}
+                    fill={color}
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    onMouseEnter={() => setHoveredWord(item)}
+                    onMouseLeave={() => setHoveredWord(null)}
+                    style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                    className="star-map-node"
+                  />
+                  
+                  {/* Word text */}
+                  <text
+                    x={pos.x}
+                    y={pos.y + 22}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#1a1a1a"
+                    fontSize="12"
+                    fontWeight="500"
+                  >
+                    {item.word}
+                  </text>
+                </g>
+              )
+            })}
+
+            {/* Tooltips layer - render all tooltips last to ensure they are on top */}
             {/* Center tooltip */}
             {hoveredWord?.type === 'center' && hoveredWord?.category === category && (
               <g>
@@ -419,7 +476,6 @@ function SearchSection() {
                   strokeWidth="1"
                   filter="url(#shadow)"
                 />
-                {/* SearchWord with badge */}
                 <text
                   x={centerX - 50}
                   y={centerY - 85}
@@ -450,7 +506,6 @@ function SearchSection() {
                 >
                   Lv.核心
                 </text>
-                {/* Category center label */}
                 <text
                   x={centerX - 50}
                   y={centerY - 60}
@@ -464,7 +519,166 @@ function SearchSection() {
               </g>
             )}
 
-            {/* Word nodes */}
+            {/* Word node tooltips */}
+            {positions.map((pos) => {
+              const item = pos.word
+              const isHovered = hoveredWord?.id === item.id
+
+              return isHovered ? (
+                <g key={`tooltip-${item.id}`}>
+                  <rect
+                    x={pos.x + 30}
+                    y={pos.y - 60}
+                    width="120"
+                    height="80"
+                    rx="8"
+                    fill="#ffffff"
+                    stroke="#e5e7eb"
+                    strokeWidth="1"
+                    filter="url(#shadow)"
+                  />
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 40}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#1a1a1a"
+                    fontSize="14"
+                    fontWeight="700"
+                  >
+                    {item.word}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 20}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#6b7280"
+                    fontSize="12"
+                  >
+                    Lv.{item.difficulty_level == null ? '增补' : item.difficulty_level}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 5}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#2563eb"
+                    fontSize="11"
+                  >
+                    ● {item.level_3}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y + 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#6b7280"
+                    fontSize="11"
+                  >
+                    所属: {item.level_4}
+                  </text>
+                </g>
+              ) : null
+            })}
+
+            {/* Shadow filter for tooltip */}
+            <defs>
+              <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.2"/>
+              </filter>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  // Render star map for category search
+  const renderCategoryStarMap = (searchTerm, items) => {
+    if (!items || items.length === 0) return null
+
+    const sortedItems = sortByDifficulty(items)
+    const centerX = 450
+    const centerY = 450
+    const positions = calculateWordPositions(sortedItems, centerX, centerY)
+
+    return (
+      <div key={`category-star-${searchTerm}`} className="star-map-container">
+        <div className="star-map-header">
+          <h3 className="star-map-title">"{searchTerm}"词汇难度辐射图</h3>
+          <p className="star-map-subtitle">由内向外: 难度等级 1 → 7/增补</p>
+        </div>
+
+        <div className="star-map-svg-container">
+          <div className="star-map-legend">
+            <div className="legend-title">难度等级图例</div>
+            <div className="legend-items">
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#10b981' }}></span>
+                <span>等级 1-2</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#2563eb' }}></span>
+                <span>等级 3-4</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+                <span>等级 5-6</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#ef4444' }}></span>
+                <span>等级 7</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: '#a855f7' }}></span>
+                <span>增补</span>
+              </div>
+            </div>
+          </div>
+          <svg width="1000" height="1000" className="star-map-svg">
+            {/* Draw concentric circles - 8 rings for difficulty levels 1-7 and null */}
+            {[90, 130, 170, 210, 250, 290, 330, 370].map((radius, i) => (
+              <circle
+                key={`ring-${i}`}
+                cx={centerX}
+                cy={centerY}
+                r={radius}
+                fill="none"
+                stroke="#d1d5db"
+                strokeWidth="1"
+              />
+            ))}
+
+            {/* Center node */}
+            <g
+              onMouseEnter={() => setHoveredWord({ type: 'center', category: searchTerm, searchWord: null })}
+              onMouseLeave={() => setHoveredWord(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              <circle
+                cx={centerX}
+                cy={centerY}
+                r="50"
+                fill="#2563eb"
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
+              <text
+                x={centerX}
+                y={centerY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#ffffff"
+                fontSize="16"
+                fontWeight="600"
+                style={{ pointerEvents: 'none' }}
+              >
+                {searchTerm.length > 6 ? searchTerm.substring(0, 6) + '...' : searchTerm}
+              </text>
+            </g>
+
+            {/* Word nodes - render all circles and text first */}
             {positions.map((pos, index) => {
               const item = pos.word
               const color = getDifficultyColor(item.difficulty_level)
@@ -472,34 +686,24 @@ function SearchSection() {
 
               return (
                 <g key={item.id}>
-                  {/* Line from center to word */}
-                  <line
-                    x1={centerX}
-                    y1={centerY}
-                    x2={pos.x}
-                    y2={pos.y}
-                    stroke="#e5e7eb"
-                    strokeWidth="1"
-                    opacity="0.3"
-                  />
-                  
                   {/* Word circle */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r="20"
+                    r={isHovered ? "14" : "11"}
                     fill={color}
                     stroke="#ffffff"
                     strokeWidth="2"
                     onMouseEnter={() => setHoveredWord(item)}
                     onMouseLeave={() => setHoveredWord(null)}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                    className="star-map-node"
                   />
                   
                   {/* Word text */}
                   <text
                     x={pos.x}
-                    y={pos.y + 35}
+                    y={pos.y + 22}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill="#1a1a1a"
@@ -508,66 +712,129 @@ function SearchSection() {
                   >
                     {item.word}
                   </text>
-
-                  {/* Tooltip */}
-                  {isHovered && (
-                    <g>
-                      <rect
-                        x={pos.x + 30}
-                        y={pos.y - 60}
-                        width="140"
-                        height="80"
-                        rx="8"
-                        fill="#ffffff"
-                        stroke="#e5e7eb"
-                        strokeWidth="1"
-                        filter="url(#shadow)"
-                      />
-                      <text
-                        x={pos.x + 100}
-                        y={pos.y - 40}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#1a1a1a"
-                        fontSize="14"
-                        fontWeight="700"
-                      >
-                        {item.word}
-                      </text>
-                      <text
-                        x={pos.x + 100}
-                        y={pos.y - 20}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#6b7280"
-                        fontSize="12"
-                      >
-                        Lv.{item.difficulty_level == null ? '增补' : item.difficulty_level}
-                      </text>
-                      <text
-                        x={pos.x + 100}
-                        y={pos.y - 5}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#2563eb"
-                        fontSize="11"
-                      >
-                        ● {item.level_3}
-                      </text>
-                      <text
-                        x={pos.x + 100}
-                        y={pos.y + 10}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#6b7280"
-                        fontSize="11"
-                      >
-                        所属: {item.level_4}
-                      </text>
-                    </g>
-                  )}
                 </g>
               )
+            })}
+
+            {/* Tooltips layer - render all tooltips last to ensure they are on top */}
+            {/* Center tooltip */}
+            {hoveredWord?.type === 'center' && hoveredWord?.category === searchTerm && (
+              <g>
+                <rect
+                  x={centerX - 70}
+                  y={centerY - 110}
+                  width="140"
+                  height="60"
+                  rx="8"
+                  fill="#ffffff"
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  filter="url(#shadow)"
+                />
+                <text
+                  x={centerX - 50}
+                  y={centerY - 85}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  fill="#1a1a1a"
+                  fontSize="14"
+                  fontWeight="700"
+                >
+                  {searchTerm}
+                </text>
+                <rect
+                  x={centerX + 10}
+                  y={centerY - 95}
+                  width="50"
+                  height="20"
+                  rx="10"
+                  fill="#dbeafe"
+                />
+                <text
+                  x={centerX + 35}
+                  y={centerY - 85}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="#2563eb"
+                  fontSize="10"
+                  fontWeight="500"
+                >
+                  Lv.核心
+                </text>
+                <text
+                  x={centerX - 50}
+                  y={centerY - 60}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  fill="#2563eb"
+                  fontSize="12"
+                >
+                  ● 义类中心
+                </text>
+              </g>
+            )}
+
+            {/* Word node tooltips */}
+            {positions.map((pos) => {
+              const item = pos.word
+              const isHovered = hoveredWord?.id === item.id
+
+              return isHovered ? (
+                <g key={`tooltip-${item.id}`}>
+                  <rect
+                    x={pos.x + 30}
+                    y={pos.y - 60}
+                    width="120"
+                    height="80"
+                    rx="8"
+                    fill="#ffffff"
+                    stroke="#e5e7eb"
+                    strokeWidth="1"
+                    filter="url(#shadow)"
+                  />
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 40}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#1a1a1a"
+                    fontSize="14"
+                    fontWeight="700"
+                  >
+                    {item.word}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 20}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#6b7280"
+                    fontSize="12"
+                  >
+                    Lv.{item.difficulty_level == null ? '增补' : item.difficulty_level}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y - 5}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#2563eb"
+                    fontSize="11"
+                  >
+                    ● {item.level_3}
+                  </text>
+                  <text
+                    x={pos.x + 90}
+                    y={pos.y + 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#6b7280"
+                    fontSize="11"
+                  >
+                    所属: {item.level_4}
+                  </text>
+                </g>
+              ) : null
             })}
 
             {/* Shadow filter for tooltip */}
@@ -775,42 +1042,59 @@ function SearchSection() {
                 </>
               ) : (
                 <>
-                  {/* Category Search: Breadcrumb */}
+                  {/* Category Search: Group by category path (level_1 > level_2 > level_3 > level_4) */}
                   {searchResults.data && searchResults.data.length > 0 && (() => {
-                    const firstItem = searchResults.data[0]
-                    const breadcrumbPath = `${firstItem.level_1} > ${firstItem.level_2} > ${firstItem.level_3} > ${firstItem.level_4}`
-                    return (
-                      <div className="category-breadcrumb">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M4 6 H20 C21.1 6 22 6.9 22 8 V16 C22 17.1 21.1 18 20 18 H4 C2.9 18 2 17.1 2 16 V8 C2 6.9 2.9 6 4 6 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
-                          <path d="M8 10 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M8 14 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                        <span>{breadcrumbPath}</span>
-                      </div>
-                    )
-                  })()}
+                    // Group items by their full category path
+                    const groupedByCategory = {}
+                    searchResults.data.forEach(item => {
+                      const categoryKey = `${item.level_1}|${item.level_2}|${item.level_3}|${item.level_4}`
+                      if (!groupedByCategory[categoryKey]) {
+                        groupedByCategory[categoryKey] = {
+                          level_1: item.level_1,
+                          level_2: item.level_2,
+                          level_3: item.level_3,
+                          level_4: item.level_4,
+                          items: []
+                        }
+                      }
+                      groupedByCategory[categoryKey].items.push(item)
+                    })
 
-                  {/* Category Search: Word Cards Grid */}
-                  <div className="word-cards-grid">
-                    {sortByDifficulty(searchResults.data).map((item) => (
-                      <div key={item.id} className="word-card">
-                        <div className="word-card-header">
-                          <span className="word-card-word">{item.word}</span>
-                          <span 
-                            className="word-card-badge"
-                            style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
-                          >
-                            {item.difficulty_level == null ? '增补' : `Lv.${item.difficulty_level}`}
-                          </span>
+                    return Object.entries(groupedByCategory).map(([categoryKey, group]) => (
+                      <div key={categoryKey} className="category-group">
+                        {/* Category Breadcrumb */}
+                        <div className="category-breadcrumb">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 6 H20 C21.1 6 22 6.9 22 8 V16 C22 17.1 21.1 18 20 18 H4 C2.9 18 2 17.1 2 16 V8 C2 6.9 2.9 6 4 6 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                            <path d="M8 10 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            <path d="M8 14 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          <span>{group.level_1} &gt; {group.level_2} &gt; {group.level_3} &gt; {group.level_4}</span>
                         </div>
-                        <div className="word-card-categories">
-                          <div className="word-card-category">L3: {item.level_3}</div>
-                          <div className="word-card-category">L4: {item.level_4}</div>
+
+                        {/* Word Cards Grid for this category */}
+                        <div className="word-cards-grid">
+                          {sortByDifficulty(group.items).map((item) => (
+                            <div key={item.id} className="word-card">
+                              <div className="word-card-header">
+                                <span className="word-card-word">{item.word}</span>
+                                <span 
+                                  className="word-card-badge"
+                                  style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
+                                >
+                                  {item.difficulty_level == null ? '增补' : `Lv.${item.difficulty_level}`}
+                                </span>
+                              </div>
+                              <div className="word-card-categories">
+                                <div className="word-card-category">L3: {item.level_3}</div>
+                                <div className="word-card-category">L4: {item.level_4}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  })()}
                 </>
               )}
             </>
@@ -833,9 +1117,15 @@ function SearchSection() {
           )}
 
           {viewMode === 'star' && activeTab === 'category' && (
-            <div className="star-map-placeholder">
-              <p>义类星图视图仅支持按词语检索</p>
-            </div>
+            <>
+              {searchResults && searchResults.data && searchResults.data.length > 0 ? (
+                renderCategoryStarMap(searchInput.trim(), searchResults.data)
+              ) : (
+                <div className="star-map-placeholder">
+                  <p>未找到相关结果</p>
+                </div>
+              )}
+            </>
           )}
         </div>
           ) : (

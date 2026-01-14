@@ -24,7 +24,7 @@ router
     );
     const queryParams = context.request.url.searchParams;
     const word = queryParams.get("word");
-    const limit = queryParams.get("limit") || "100";
+    const limit = queryParams.get("limit") || "1000";
     const cursor = queryParams.get("cursor");
 
     // Validate word parameter
@@ -129,7 +129,7 @@ router
     );
     const queryParams = context.request.url.searchParams;
     const level = queryParams.get("level");
-    const limit = queryParams.get("limit") || "100";
+    const limit = queryParams.get("limit") || "1000";
     const cursor = queryParams.get("cursor");
 
     // Validate level parameter
@@ -150,79 +150,30 @@ router
     }
 
     try {
-      // Search across level_1, level_2, level_3, and level_4 columns
-      // Build queries for each level column
-      const levelColumns = ["level_1", "level_2", "level_3", "level_4"];
-      const allQueries = levelColumns.map((col) => {
-        let query = supabase
-          .from("vocabulary_difficulty_levels")
-          .select("*")
-          .eq(col, level)
-          .order("id", { ascending: true });
-
-        // Add cursor-based pagination if cursor is provided
-        if (cursor) {
-          const cursorNum = parseInt(cursor, 10);
-          if (!isNaN(cursorNum)) {
-            query = query.gt("id", cursorNum);
-          }
-        }
-
-        return query;
+      // Use RPC function with PGroonga &@~ operator for prefix search
+      // This searches across level_1, level_2, level_3, and level_4 columns
+      const cursorNum = cursor ? parseInt(cursor, 10) : null;
+      
+      const { data, error } = await supabase.rpc('search_by_level_pgroonga', {
+        search_term: level,
+        cursor_id: cursorNum,
+        limit_count: limitNum
       });
 
-      // Execute all queries in parallel
-      const results = await Promise.all(allQueries);
-
-      // Check for errors
-      for (const result of results) {
-        if (result.error) {
-          console.error("Database error:", result.error);
-          context.response.status = 500;
-          context.response.body = { error: "Database query failed" };
-          return;
-        }
+      if (error) {
+        console.error("Database error:", error);
+        context.response.status = 500;
+        context.response.body = { error: "Database query failed" };
+        return;
       }
 
-      // Combine all results and remove duplicates (by id)
-      const combinedData: any[] = [];
-      const seenIds = new Set<number>();
-
-      for (const result of results) {
-        if (result.data) {
-          for (const item of result.data) {
-            if (!seenIds.has(item.id)) {
-              seenIds.add(item.id);
-              combinedData.push(item);
-            }
-          }
-        }
-      }
-
-      // Sort combined results by id
-      combinedData.sort((a, b) => a.id - b.id);
-
-      // Apply limit and pagination
-      let paginatedData = combinedData;
-      if (cursor) {
-        const cursorNum = parseInt(cursor, 10);
-        if (!isNaN(cursorNum)) {
-          paginatedData = combinedData.filter((item) => item.id > cursorNum);
-        }
-      }
-
-      // Apply limit
-      const limitedData = paginatedData.slice(0, limitNum);
+      const limitedData = data || [];
 
       // Calculate next cursor for pagination
       let nextCursor = null;
-      if (limitedData.length === limitNum && limitedData.length > 0) {
-        // Check if there are more items after the current page
-        const lastId = limitedData[limitedData.length - 1].id;
-        const hasMore = paginatedData.length > limitNum;
-        if (hasMore) {
-          nextCursor = lastId;
-        }
+      const hasMore = limitedData.length === limitNum;
+      if (hasMore && limitedData.length > 0) {
+        nextCursor = limitedData[limitedData.length - 1].id;
       }
 
       context.response.body = {
@@ -231,7 +182,7 @@ router
           limit: limitNum,
           cursor: cursor || null,
           nextCursor,
-          hasMore: limitedData.length === limitNum && paginatedData.length > limitNum,
+          hasMore,
         },
       };
     } catch (err) {
