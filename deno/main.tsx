@@ -46,47 +46,74 @@ router
 
     try {
       // Build the query with pagination
-      let query = supabase
-        .from("vocabulary_difficulty_levels")
-        .select("*")
-        .ilike("word", `%${word}%`)
-        .order("id", { ascending: true })
-        .limit(limitNum);
+      // Requirement:
+      // - match: "打1", "打2", "打3"... (word + digits)
+      // - NOT match: "打手" (word + non-digits)
+      //
+      // Supabase query builder doesn't expose a direct regex operator for column filtering,
+      // so we fetch prefix matches and then filter server-side to keep only:
+      // - exact word
+      // - word + digits only
 
-      // Add cursor-based pagination if cursor is provided
-      if (cursor) {
-        const cursorNum = parseInt(cursor, 10);
-        if (isNaN(cursorNum)) {
-          context.response.status = 400;
-          context.response.body = { error: "cursor must be a valid number" };
+      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const wordDigitsOnly = new RegExp(`^${escapeRegExp(word)}\\d+$`);
+
+      const batchSize = Math.min(1000, Math.max(limitNum * 5, 200));
+      const cursorNum = cursor ? parseInt(cursor, 10) : null;
+      let scanCursor = cursorNum;
+
+      // Collect one extra item to determine hasMore reliably.
+      const collected: any[] = [];
+
+      while (collected.length < limitNum + 1) {
+        let query = supabase
+          .from("vocabulary_difficulty_levels")
+          .select("*")
+          .ilike("word", `${word}%`)
+          .order("id", { ascending: true })
+          .limit(batchSize);
+
+        if (scanCursor != null && !isNaN(scanCursor)) {
+          query = query.gt("id", scanCursor);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("Database error:", error);
+          context.response.status = 500;
+          context.response.body = { error: "Database query failed" };
           return;
         }
-        query = query.gt("id", cursorNum);
+
+        if (!data || data.length === 0) break;
+
+        // Move scan cursor forward (regardless of whether items are filtered out)
+        scanCursor = data[data.length - 1].id;
+
+        // Keep only exact match or word + digits
+        for (const item of data) {
+          if (item.word === word || wordDigitsOnly.test(item.word)) {
+            collected.push(item);
+            if (collected.length >= limitNum + 1) break;
+          }
+        }
+
+        // No more rows available in this prefix range
+        if (data.length < batchSize) break;
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Database error:", error);
-        context.response.status = 500;
-        context.response.body = { error: "Database query failed" };
-        return;
-      }
-
-      // Calculate next cursor for pagination
-      let nextCursor = null;
-      if (data && data.length === limitNum && data.length > 0) {
-        // If we got exactly the limit, there might be more data
-        nextCursor = data[data.length - 1].id;
-      }
+      const limited = collected.slice(0, limitNum);
+      const hasMore = collected.length > limitNum;
+      const nextCursor = hasMore && limited.length > 0 ? limited[limited.length - 1].id : null;
 
       context.response.body = {
-        data,
+        data: limited,
         pagination: {
           limit: limitNum,
           cursor: cursor || null,
           nextCursor,
-          hasMore: data && data.length === limitNum,
+          hasMore,
         },
       };
     } catch (err) {
@@ -224,34 +251,35 @@ router
 // Initialize application
 const app = new Application();
 
-// Middleware: Error handling
+// CORS middleware
+app.use(oakCors());
+
+// Router middleware
+app.use(router.routes());
+app.use(router.allowedMethods());
+
+// Error handling middleware
 app.use(async (context, next) => {
   try {
     await next();
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Unhandled error:", err);
     context.response.status = 500;
     context.response.body = {
-      success: false,
       error: "Internal server error",
+      message: err instanceof Error ? err.message : "Unknown error",
     };
   }
 });
 
-// Middleware: Logger
-app.use(async (context, next) => {
-  const start = Date.now();
-  await next();
-  const ms = Date.now() - start;
-  console.log(`${context.request.method} ${context.request.url} - ${ms}ms`);
+// 404 handler
+app.use((context) => {
+  context.response.status = 404;
+  context.response.body = {
+    error: "Not found",
+    path: context.request.url.pathname,
+  };
 });
-
-// Middleware: CORS for all routes
-app.use(oakCors());
-
-// Middleware: Router
-app.use(router.routes());
-app.use(router.allowedMethods());
 
 // Start server
 const port = 8000;

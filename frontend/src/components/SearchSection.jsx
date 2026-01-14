@@ -1,23 +1,585 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './SearchSection.css'
 
 function SearchSection() {
   const [activeTab, setActiveTab] = useState('word')
   const [searchInput, setSearchInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [searchResults, setSearchResults] = useState(null)
+  const [viewMode, setViewMode] = useState('list') // 'list' or 'star'
+  const [categoryExpandedData, setCategoryExpandedData] = useState({ level3: {}, level4: {} })
+  const [categoryLoading, setCategoryLoading] = useState(false)
+  const [hoveredWord, setHoveredWord] = useState(null)
 
-  const handleSearch = () => {
+  // Fetch all words for each unique level_3 and level_4 when search results change
+  useEffect(() => {
+    if (activeTab === 'word' && searchResults && searchResults.data && searchResults.data.length > 0) {
+      const fetchCategoryWords = async () => {
+        setCategoryLoading(true)
+        try {
+          // Extract unique level_3 and level_4 values
+          // Use Map for level_4 to bind the first original search word to each category
+          const uniqueLevel3 = new Set()
+          const level4ToWord = new Map() // Map: level_4 -> first original search word
+          console.log('searchResults.data', searchResults.data)
+          searchResults.data.forEach(item => {
+            if (item.level_3) uniqueLevel3.add(item.level_3)
+            if (item.level_4) {
+              // Only store the first word for each level_4
+              if (!level4ToWord.has(item.level_4)) {
+                level4ToWord.set(item.level_4, item.word)
+              }
+            }
+          })
+
+          // Fetch all words for each level_3
+          const level3Promises = Array.from(uniqueLevel3).map(async (level3) => {
+            try {
+              const apiUrl = new URL('https://backend.cnsemantics.com/search_by_level')
+              apiUrl.searchParams.append('level', level3)
+              apiUrl.searchParams.append('limit', '1000')
+              
+              const response = await fetch(apiUrl.toString())
+              if (!response.ok) {
+                console.error(`Failed to fetch level_3: ${level3}`)
+                return { level3, data: [] }
+              }
+              
+              const result = await response.json()
+              // Filter to only include words with matching level_3
+              const filtered = result.data.filter(item => item.level_3 === level3)
+              return { level3, data: filtered }
+            } catch (err) {
+              console.error(`Error fetching level_3 ${level3}:`, err)
+              return { level3, data: [] }
+            }
+          })
+
+          // Fetch all words for each level_4
+          const level4Promises = Array.from(level4ToWord.keys()).map(async (level4) => {
+            try {
+              const apiUrl = new URL('https://backend.cnsemantics.com/search_by_level')
+              apiUrl.searchParams.append('level', level4)
+              apiUrl.searchParams.append('limit', '1000')
+              
+              const response = await fetch(apiUrl.toString())
+              if (!response.ok) {
+                console.error(`Failed to fetch level_4: ${level4}`)
+                return { level4, data: [] }
+              }
+              
+              const result = await response.json()
+              // Filter to only include words with matching level_4
+              const filtered = result.data.filter(item => item.level_4 === level4)
+              return { level4, data: filtered }
+            } catch (err) {
+              console.error(`Error fetching level_4 ${level4}:`, err)
+              return { level4, data: [] }
+            }
+          })
+
+          // Wait for all requests to complete
+          const [level3Results, level4Results] = await Promise.all([
+            Promise.all(level3Promises),
+            Promise.all(level4Promises)
+          ])
+
+          // Organize results into the same structure as groupResultsByCategory
+          const level3Groups = {}
+          level3Results.forEach(({ level3, data }) => {
+            level3Groups[level3] = data
+          })
+
+          console.log('level3Groups', level3Groups)
+
+          const level4Groups = {}
+          level4Results.forEach(({ level4, data }) => {
+            level4Groups[level4] = {
+              data: data,
+              searchWord: level4ToWord.get(level4) || null // First original search word for this level_4
+            }
+          })
+
+          console.log('level4Groups', level4Groups)
+
+          // Add original searchResults.data words to the groups
+          searchResults.data.forEach(originalItem => {
+            // Add to level3Groups
+            if (originalItem.level_3) {
+              if (!level3Groups[originalItem.level_3]) {
+                level3Groups[originalItem.level_3] = []
+              }
+              // Check if item already exists (by id) to avoid duplicates
+              const existsInLevel3 = level3Groups[originalItem.level_3].some(item => item.id === originalItem.id)
+              if (!existsInLevel3) {
+                level3Groups[originalItem.level_3].push(originalItem)
+              }
+            }
+
+            // Add to level4Groups (now has { data, searchWord } structure)
+            if (originalItem.level_4) {
+              if (!level4Groups[originalItem.level_4]) {
+                level4Groups[originalItem.level_4] = {
+                  data: [],
+                  searchWord: level4ToWord.get(originalItem.level_4) || null
+                }
+              }
+              // Check if item already exists (by id) to avoid duplicates
+              const existsInLevel4 = level4Groups[originalItem.level_4].data.some(item => item.id === originalItem.id)
+              if (!existsInLevel4) {
+                level4Groups[originalItem.level_4].data.push(originalItem)
+              }
+            }
+          })
+
+          setCategoryExpandedData({ level3: level3Groups, level4: level4Groups })
+        } catch (err) {
+          console.error('Error fetching category words:', err)
+        } finally {
+          setCategoryLoading(false)
+        }
+      }
+
+      fetchCategoryWords()
+    } else {
+      // Reset when not in word search mode or no results
+      setCategoryExpandedData({ level3: {}, level4: {} })
+    }
+  }, [searchResults, activeTab])
+
+  const handleSearch = async () => {
     if (!searchInput.trim()) {
       alert('请输入搜索内容')
       return
     }
-    console.log(`Searching ${activeTab === 'word' ? 'by word' : 'by category'}:`, searchInput)
-    // TODO: Implement search logic
+
+    // Only call API for word search tab
+    if (activeTab === 'word') {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const word = searchInput.trim()
+        const apiUrl = new URL('https://backend.cnsemantics.com/search_by_word')
+        apiUrl.searchParams.append('word', word)
+        apiUrl.searchParams.append('limit', '100')
+
+        const response = await fetch(apiUrl.toString())
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+        console.log('Search results:', result)
+        setSearchResults(result)
+      } catch (err) {
+        console.error('Search error:', err)
+        setError(err.message || '搜索失败，请稍后重试')
+        alert(err.message || '搜索失败，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      // Category search - call search_by_level API
+      setLoading(true)
+      setError(null)
+
+      try {
+        const level = searchInput.trim()
+        const apiUrl = new URL('https://backend.cnsemantics.com/search_by_level')
+        apiUrl.searchParams.append('level', level)
+        apiUrl.searchParams.append('limit', '100')
+
+        const response = await fetch(apiUrl.toString())
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+        console.log('Search results:', result)
+        setSearchResults(result)
+      } catch (err) {
+        console.error('Search error:', err)
+        setError(err.message || '搜索失败，请稍后重试')
+        alert(err.message || '搜索失败，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
+    }
   }
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleSearch()
     }
+  }
+
+  // Group results by level_3 and level_4
+  const groupResultsByCategory = (data) => {
+    if (!data || data.length === 0) return { level3: {}, level4: {} }
+
+    const level3Groups = {}
+    const level4Groups = {}
+
+    data.forEach(item => {
+      // Group by level_3
+      const l3 = item.level_3
+      if (!level3Groups[l3]) {
+        level3Groups[l3] = []
+      }
+      level3Groups[l3].push(item)
+
+      // Group by level_4
+      const l4 = item.level_4
+      if (!level4Groups[l4]) {
+        level4Groups[l4] = []
+      }
+      level4Groups[l4].push(item)
+    })
+
+    return { level3: level3Groups, level4: level4Groups }
+  }
+
+  // Get difficulty badge color
+  const getDifficultyColor = (level) => {
+    if (level == null) return '#a855f7' // purple for 增补
+    if (level <= 2) return '#10b981' // green for level 1, 2
+    if (level <= 4) return '#2563eb' // blue for level 3, 4
+    if (level <= 6) return '#f59e0b' // orange for level 5, 6
+    return '#ef4444' // red for level 7
+  }
+
+  // Sort items by difficulty_level (1-7, then null/增补)
+  const sortByDifficulty = (items) => {
+    return [...items].sort((a, b) => {
+      // Null values go to the end
+      if (a.difficulty_level == null && b.difficulty_level == null) return 0
+      if (a.difficulty_level == null) return 1
+      if (b.difficulty_level == null) return -1
+      // Sort by difficulty_level ascending (1 to 7)
+      return a.difficulty_level - b.difficulty_level
+    })
+  }
+
+  // Get the main searched word (first result or exact match)
+  const getMainWord = () => {
+    if (!searchResults || !searchResults.data || searchResults.data.length === 0) return null
+    // Try to find exact match first
+    const exactMatch = searchResults.data.find(item => 
+      item.word.toLowerCase() === searchInput.trim().toLowerCase()
+    )
+    return exactMatch || searchResults.data[0]
+  }
+
+  // Calculate positions for words in concentric circles
+  const calculateWordPositions = (words, centerX, centerY) => {
+    if (!words || words.length === 0) return []
+    
+    const rings = [
+      { radius: 80, maxWords: 3 },
+      { radius: 140, maxWords: 6 },
+      { radius: 200, maxWords: 12 },
+      { radius: 260, maxWords: 20 }
+    ]
+
+    const positions = []
+    let wordIndex = 0
+
+    for (let ringIndex = 0; ringIndex < rings.length && wordIndex < words.length; ringIndex++) {
+      const ring = rings[ringIndex]
+      const wordsInRing = Math.min(ring.maxWords, words.length - wordIndex)
+      const angleStep = (2 * Math.PI) / wordsInRing
+
+      for (let i = 0; i < wordsInRing && wordIndex < words.length; i++) {
+        const angle = i * angleStep - Math.PI / 2 // Start from top
+        const x = centerX + ring.radius * Math.cos(angle)
+        const y = centerY + ring.radius * Math.sin(angle)
+        
+        positions.push({
+          word: words[wordIndex],
+          x,
+          y,
+          angle
+        })
+        wordIndex++
+      }
+    }
+
+    return positions
+  }
+
+  // Render star map for a category
+  const renderStarMap = (category, items, searchWord = null) => {
+    if (!items || items.length === 0) return null
+
+    const sortedItems = sortByDifficulty(items)
+    const centerX = 300
+    const centerY = 300
+    const positions = calculateWordPositions(sortedItems, centerX, centerY)
+
+    // Get the level_4 category for this level_3
+    const level4Category = items[0]?.level_4 || ''
+
+    return (
+      <div key={`star-${category}`} className="star-map-container">
+        <div className="star-map-header">
+          <h3 className="star-map-title">"{category}"义类词汇辐射图</h3>
+          {searchWord && (
+            <p className="star-map-subtitle">包含检索词: {searchWord}</p>
+          )}
+        </div>
+
+        <div className="star-map-legend">
+          <div className="legend-title">难度等级图例</div>
+          <div className="legend-items">
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#10b981' }}></span>
+              <span>等级 1-2</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#2563eb' }}></span>
+              <span>等级 3-4</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+              <span>等级 5-6</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#ef4444' }}></span>
+              <span>等级 7</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#a855f7' }}></span>
+              <span>增补</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="star-map-svg-container">
+          <svg width="600" height="600" className="star-map-svg">
+            {/* Draw concentric circles */}
+            {[80, 140, 200, 260].map((radius, i) => (
+              <circle
+                key={`ring-${i}`}
+                cx={centerX}
+                cy={centerY}
+                r={radius}
+                fill="none"
+                stroke="#e5e7eb"
+                strokeWidth="1"
+                strokeDasharray="2,2"
+                opacity="0.5"
+              />
+            ))}
+
+            {/* Center node */}
+            <g
+              onMouseEnter={() => setHoveredWord({ type: 'center', category, searchWord })}
+              onMouseLeave={() => setHoveredWord(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              <circle
+                cx={centerX}
+                cy={centerY}
+                r="50"
+                fill="#2563eb"
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
+              <text
+                x={centerX}
+                y={centerY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#ffffff"
+                fontSize="16"
+                fontWeight="600"
+                style={{ pointerEvents: 'none' }}
+              >
+                {category.length > 6 ? category.substring(0, 6) + '...' : category}
+              </text>
+            </g>
+
+            {/* Center tooltip */}
+            {hoveredWord?.type === 'center' && hoveredWord?.category === category && (
+              <g>
+                <rect
+                  x={centerX - 70}
+                  y={centerY - 110}
+                  width="140"
+                  height="60"
+                  rx="8"
+                  fill="#ffffff"
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  filter="url(#shadow)"
+                />
+                {/* SearchWord with badge */}
+                <text
+                  x={centerX - 50}
+                  y={centerY - 85}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  fill="#1a1a1a"
+                  fontSize="14"
+                  fontWeight="700"
+                >
+                  {category}
+                </text>
+                <rect
+                  x={centerX + 10}
+                  y={centerY - 95}
+                  width="50"
+                  height="20"
+                  rx="10"
+                  fill="#dbeafe"
+                />
+                <text
+                  x={centerX + 35}
+                  y={centerY - 85}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="#2563eb"
+                  fontSize="10"
+                  fontWeight="500"
+                >
+                  Lv.核心
+                </text>
+                {/* Category center label */}
+                <text
+                  x={centerX - 50}
+                  y={centerY - 60}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  fill="#2563eb"
+                  fontSize="12"
+                >
+                  ● 义类中心
+                </text>
+              </g>
+            )}
+
+            {/* Word nodes */}
+            {positions.map((pos, index) => {
+              const item = pos.word
+              const color = getDifficultyColor(item.difficulty_level)
+              const isHovered = hoveredWord?.id === item.id
+
+              return (
+                <g key={item.id}>
+                  {/* Line from center to word */}
+                  <line
+                    x1={centerX}
+                    y1={centerY}
+                    x2={pos.x}
+                    y2={pos.y}
+                    stroke="#e5e7eb"
+                    strokeWidth="1"
+                    opacity="0.3"
+                  />
+                  
+                  {/* Word circle */}
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r="20"
+                    fill={color}
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    onMouseEnter={() => setHoveredWord(item)}
+                    onMouseLeave={() => setHoveredWord(null)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  
+                  {/* Word text */}
+                  <text
+                    x={pos.x}
+                    y={pos.y + 35}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#1a1a1a"
+                    fontSize="12"
+                    fontWeight="500"
+                  >
+                    {item.word}
+                  </text>
+
+                  {/* Tooltip */}
+                  {isHovered && (
+                    <g>
+                      <rect
+                        x={pos.x + 30}
+                        y={pos.y - 60}
+                        width="140"
+                        height="80"
+                        rx="8"
+                        fill="#ffffff"
+                        stroke="#e5e7eb"
+                        strokeWidth="1"
+                        filter="url(#shadow)"
+                      />
+                      <text
+                        x={pos.x + 100}
+                        y={pos.y - 40}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill="#1a1a1a"
+                        fontSize="14"
+                        fontWeight="700"
+                      >
+                        {item.word}
+                      </text>
+                      <text
+                        x={pos.x + 100}
+                        y={pos.y - 20}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill="#6b7280"
+                        fontSize="12"
+                      >
+                        Lv.{item.difficulty_level == null ? '增补' : item.difficulty_level}
+                      </text>
+                      <text
+                        x={pos.x + 100}
+                        y={pos.y - 5}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill="#2563eb"
+                        fontSize="11"
+                      >
+                        ● {item.level_3}
+                      </text>
+                      <text
+                        x={pos.x + 100}
+                        y={pos.y + 10}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill="#6b7280"
+                        fontSize="11"
+                      >
+                        所属: {item.level_4}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              )
+            })}
+
+            {/* Shadow filter for tooltip */}
+            <defs>
+              <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.2"/>
+              </filter>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -56,21 +618,235 @@ function SearchSection() {
             <input
               type="text"
               className="search-input"
-              placeholder={activeTab === 'word' ? '请输入词语,如:害羞、波浪...' : '请输入义类名称,如:情感、自然...'}
+              placeholder={activeTab === 'word' ? '请输入词语，如：海洋、乐观、应聘' : '请输入义类名称，如：感情、肢体动作、自然事物'}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
             />
           </div>
-          <button className="search-button" onClick={handleSearch}>
-            搜索
+          <button className="search-button" onClick={handleSearch} disabled={loading}>
+            {loading ? '搜索中...' : '搜索'}
           </button>
         </div>
 
         <p className="search-hint">
-          提示:系统会自动识别词语后的数字编号
+        支持模糊检索，若被检索词 W 为多义类项词语，则同时呈现 W1、W2、W3.......对应的结果。
         </p>
       </div>
+
+      {/* Search Results */}
+      {searchResults && (
+        <>
+          {searchResults.data && searchResults.data.length > 0 ? (
+        <div className="search-results">
+          <div className="results-header">
+            {activeTab === 'word' ? (
+              <h2 className="results-title">检索结果</h2>
+            ) : (
+              <h2 className="results-title">检索到 {searchResults.data.length} 个相关词语</h2>
+            )}
+            <div className="view-toggle">
+              <button
+                className={`toggle-button ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/>
+                </svg>
+                <span>列表视图</span>
+              </button>
+              <button
+                className={`toggle-button ${viewMode === 'star' ? 'active' : ''}`}
+                onClick={() => setViewMode('star')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2 L15.09 8.26 L22 9.27 L17 14.14 L18.18 21.02 L12 17.77 L5.82 21.02 L7 14.14 L2 9.27 L8.91 8.26 L12 2 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                </svg>
+                <span>义类星图</span>
+              </button>
+            </div>
+          </div>
+
+          {viewMode === 'list' && (
+            <>
+              {activeTab === 'word' ? (
+                <>
+                  {/* Word Search: Searched Word Information */}
+                  {searchResults.data && searchResults.data.length > 0 && (
+                    <div className="word-info-section">
+                      <div className="word-info-label">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M12 8 V12 M12 16 H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                        <span>检索词信息</span>
+                      </div>
+                      <div className="word-info-cards-grid">
+                        {sortByDifficulty(searchResults.data).map((item) => (
+                          <div key={item.id} className="word-info-card">
+                            <div className="word-info-main">
+                              <span className="word-info-word">{item.word}</span>
+                              <span 
+                                className="word-info-badge"
+                                style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
+                              >
+                                {item.difficulty_level == null ? '增补' : `等级${item.difficulty_level}`}
+                              </span>
+                            </div>
+                            <div className="word-info-path">
+                              {item.level_3} &gt; {item.level_4}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Word Search: Level 3 Categories - using expanded data from API */}
+                  {categoryLoading ? (
+                    <div className="category-loading">
+                      <p>加载相关词语中...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {Object.entries(categoryExpandedData.level3).map(([category, items]) => (
+                        <div key={`l3-${category}`} className="category-section">
+                          <div className="category-header">
+                            <h3 className="category-title">三级义类: {category}</h3>
+                            <span className="category-count">{items.length}个词语</span>
+                          </div>
+                          <div className="word-cards-grid">
+                            {sortByDifficulty(items).map((item) => (
+                              <div key={item.id} className="word-card">
+                                <div className="word-card-header">
+                                  <span className="word-card-word">{item.word}</span>
+                                  <span 
+                                    className="word-card-badge"
+                                    style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
+                                  >
+                                    {item.difficulty_level == null ? '增补' : `Lv.${item.difficulty_level}`}
+                                  </span>
+                                </div>
+                                <div className="word-card-categories">
+                                  <div className="word-card-category">L3: {item.level_3}</div>
+                                  <div className="word-card-category">L4: {item.level_4}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Word Search: Level 4 Categories - using expanded data from API */}
+                      {Object.entries(categoryExpandedData.level4).map(([category, groupData]) => (
+                        <div key={`l4-${category}`} className="category-section">
+                          <div className="category-header">
+                            <h3 className="category-title">四级义类: {category}</h3>
+                            <span className="category-count">{groupData.data.length}个词语</span>
+                            {groupData.searchWord && (
+                              <span className="search-words-badge">检索词: {groupData.searchWord}</span>
+                            )}
+                          </div>
+                          <div className="word-cards-grid">
+                            {sortByDifficulty(groupData.data).map((item) => (
+                              <div key={item.id} className="word-card">
+                                <div className="word-card-header">
+                                  <span className="word-card-word">{item.word}</span>
+                                  <span 
+                                    className="word-card-badge"
+                                    style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
+                                  >
+                                    {item.difficulty_level == null ? '增补' : `Lv.${item.difficulty_level}`}
+                                  </span>
+                                </div>
+                                <div className="word-card-categories">
+                                  <div className="word-card-category">L3: {item.level_3}</div>
+                                  <div className="word-card-category">L4: {item.level_4}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Category Search: Breadcrumb */}
+                  {searchResults.data && searchResults.data.length > 0 && (() => {
+                    const firstItem = searchResults.data[0]
+                    const breadcrumbPath = `${firstItem.level_1} > ${firstItem.level_2} > ${firstItem.level_3} > ${firstItem.level_4}`
+                    return (
+                      <div className="category-breadcrumb">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M4 6 H20 C21.1 6 22 6.9 22 8 V16 C22 17.1 21.1 18 20 18 H4 C2.9 18 2 17.1 2 16 V8 C2 6.9 2.9 6 4 6 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                          <path d="M8 10 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M8 14 H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                        <span>{breadcrumbPath}</span>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Category Search: Word Cards Grid */}
+                  <div className="word-cards-grid">
+                    {sortByDifficulty(searchResults.data).map((item) => (
+                      <div key={item.id} className="word-card">
+                        <div className="word-card-header">
+                          <span className="word-card-word">{item.word}</span>
+                          <span 
+                            className="word-card-badge"
+                            style={{ backgroundColor: getDifficultyColor(item.difficulty_level) }}
+                          >
+                            {item.difficulty_level == null ? '增补' : `Lv.${item.difficulty_level}`}
+                          </span>
+                        </div>
+                        <div className="word-card-categories">
+                          <div className="word-card-category">L3: {item.level_3}</div>
+                          <div className="word-card-category">L4: {item.level_4}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {viewMode === 'star' && activeTab === 'word' && (
+            <>
+              {categoryLoading ? (
+                <div className="category-loading">
+                  <p>加载相关词语中...</p>
+                </div>
+              ) : (
+                <>
+                  {Object.entries(categoryExpandedData.level4).map(([category, groupData]) => 
+                    renderStarMap(category, groupData.data, groupData.searchWord)
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {viewMode === 'star' && activeTab === 'category' && (
+            <div className="star-map-placeholder">
+              <p>义类星图视图仅支持按词语检索</p>
+            </div>
+          )}
+        </div>
+          ) : (
+            <div className="search-results">
+              <div className="no-results">
+                <p>未找到相关结果</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </section>
   )
 }
