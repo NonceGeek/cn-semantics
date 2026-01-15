@@ -642,3 +642,42 @@
     min-height: 300px;
   }
 }
+
+/* Mobile Star Map Hint */
+.mobile-star-map-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background-color: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  color: #92400e;
+}
+
+.mobile-star-map-hint svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #f59e0b;
+}
+
+.mobile-star-map-hint .hint-content {
+  flex: 1;
+}
+
+.mobile-star-map-hint .hint-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #78350f;
+}
+
+.mobile-star-map-hint .hint-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #92400e;
+}

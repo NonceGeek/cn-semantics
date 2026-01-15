@@ -11,6 +11,21 @@ function SearchSection() {
   const [categoryExpandedData, setCategoryExpandedData] = useState({ level3: {}, level4: {} })
   const [categoryLoading, setCategoryLoading] = useState(false)
   const [hoveredWord, setHoveredWord] = useState(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase()) || 
+                             (window.innerWidth <= 768)
+      setIsMobile(isMobileDevice)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Fetch all words for each unique level_3 and level_4 when search results change
   useEffect(() => {
@@ -1100,30 +1115,49 @@ function SearchSection() {
             </>
           )}
 
-          {viewMode === 'star' && activeTab === 'word' && (
+          {viewMode === 'star' && (
             <>
-              {categoryLoading ? (
-                <div className="category-loading">
-                  <p>加载相关词语中...</p>
+              {isMobile ? (
+                <div className="mobile-star-map-hint">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2 C6.48 2 2 6.48 2 12 C2 17.52 6.48 22 12 22 C17.52 22 22 17.52 22 12 C22 6.48 17.52 2 12 2 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                    <path d="M12 8 V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M12 16 H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <div className="hint-content">
+                    <p className="hint-title">建议使用电脑查看</p>
+                    <p className="hint-description">义类星图在移动设备上体验不佳，建议您在电脑上打开此页面以获得最佳体验。</p>
+                  </div>
                 </div>
               ) : (
                 <>
-                  {Object.entries(categoryExpandedData.level4).map(([category, groupData]) => 
-                    renderStarMap(category, groupData.data, groupData.searchWord)
+                  {activeTab === 'word' && (
+                    <>
+                      {categoryLoading ? (
+                        <div className="category-loading">
+                          <p>加载相关词语中...</p>
+                        </div>
+                      ) : (
+                        <>
+                          {Object.entries(categoryExpandedData.level4).map(([category, groupData]) => 
+                            renderStarMap(category, groupData.data, groupData.searchWord)
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                  {activeTab === 'category' && (
+                    <>
+                      {searchResults && searchResults.data && searchResults.data.length > 0 ? (
+                        renderCategoryStarMap(searchInput.trim(), searchResults.data)
+                      ) : (
+                        <div className="star-map-placeholder">
+                          <p>未找到相关结果</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
-              )}
-            </>
-          )}
-
-          {viewMode === 'star' && activeTab === 'category' && (
-            <>
-              {searchResults && searchResults.data && searchResults.data.length > 0 ? (
-                renderCategoryStarMap(searchInput.trim(), searchResults.data)
-              ) : (
-                <div className="star-map-placeholder">
-                  <p>未找到相关结果</p>
-                </div>
               )}
             </>
           )}
